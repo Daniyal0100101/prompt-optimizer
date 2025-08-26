@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Global scrollbar styling and text selection colors */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 #e5e7eb; /* thumb track */
+  scrollbar-gutter: stable both-edges;
+}
+
+/* Theme transitions (respect reduced motion) */
+@media (prefers-reduced-motion: no-preference) {
+  html, body, * {
+    transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+  }
+}
+
+/* Light theme defaults */
+html {
+  color-scheme: light dark; /* hint to UA for forms/scrollbars */
+}
+
+/* Dark theme overrides (html.dark is toggled in layout) */
+.dark {
+  scrollbar-color: #64748b #1f2937; /* thumb track */
+}
+.dark html {
+  scrollbar-color: #64748b #1f2937; /* thumb track */
+}
+.dark ::-webkit-scrollbar-track {
+  background: #1f2937; /* gray-800 */
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #22d3ee 0%, #3b82f6 60%, #6366f1 100%);
+  border: 2px solid #111827; /* gray-900 */
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #06b6d4 0%, #2563eb 60%, #4f46e5 100%);
+}
+
+/* Text selection colors */
+::selection {
+  background: rgba(34, 211, 238, 0.28); /* cyan-400 */
+  color: #0f172a; /* slate-900 for readability */
+}
+::-moz-selection {
+  background: rgba(34, 211, 238, 0.28);
+  color: #0f172a;
+}
+.dark ::selection {
+  background: rgba(59, 130, 246, 0.35); /* blue-500 */
+  color: #f8fafc; /* near-white */
+}
+.dark ::-moz-selection {
+  background: rgba(59, 130, 246, 0.35);
+  color: #f8fafc;
+}
+
+/* Indeterminate progress bar (used in PromptOptimizer) */
+.progress {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  background: rgba(148, 163, 184, 0.25); /* slate-400 */
+  border-radius: 9999px;
+  overflow: hidden;
+}
+.dark .progress {
+  background: rgba(55, 65, 81, 0.7); /* gray-700 */
+}
+.progress .bar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  background: linear-gradient(90deg, #22d3ee, #3b82f6, #6366f1);
+  filter: drop-shadow(0 0 6px rgba(34, 211, 238, 0.45));
+  animation: progress-slide 1.2s ease-in-out infinite;
+}
+
+@keyframes progress-slide {
+  0% { transform: translateX(-60%); }
+  50% { transform: translateX(20%); }
+  100% { transform: translateX(120%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress .bar { animation: none; width: 30%; transform: translateX(35%); }
+}
