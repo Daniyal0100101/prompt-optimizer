@@ -5,7 +5,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import * as CryptoJS from 'crypto-js';
 
-const SECRET_KEY = 'your-super-secret-key';
+const SECRET_KEY = 'uJioow3SoPYeAG3iEBRGlSAdFMi8C10AfZVrw3X_4dg=';
 
 export default function OptimizeSessionPage() {
   const router = useRouter();

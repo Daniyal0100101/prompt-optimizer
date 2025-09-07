@@ -6,7 +6,7 @@ import { FiEdit2, FiTrash2 } from 'react-icons/fi';
 import { useRouter } from 'next/navigation';
 import * as CryptoJS from 'crypto-js';
 
-const SECRET_KEY = 'your-super-secret-key';
+const SECRET_KEY = 'uJioow3SoPYeAG3iEBRGlSAdFMi8C10AfZVrw3X_4dg=';
 
 export default function Home() {
   const [hasKey, setHasKey] = useState(false);

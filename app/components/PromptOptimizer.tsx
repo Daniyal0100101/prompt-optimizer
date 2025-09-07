@@ -8,7 +8,7 @@ import * as CryptoJS from 'crypto-js';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 
-const SECRET_KEY = 'your-super-secret-key';
+const SECRET_KEY = 'uJioow3SoPYeAG3iEBRGlSAdFMi8C10AfZVrw3X_4dg=';
 
 interface PromptOptimizerProps {
   apiKey?: string;

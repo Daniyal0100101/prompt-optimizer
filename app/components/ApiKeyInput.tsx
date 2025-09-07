@@ -5,7 +5,7 @@ import { FiKey, FiCheck, FiAlertCircle, FiInfo } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import * as CryptoJS from 'crypto-js';
 
-const SECRET_KEY = 'your-super-secret-key';
+const SECRET_KEY = 'uJioow3SoPYeAG3iEBRGlSAdFMi8C10AfZVrw3X_4dg=';
 
 interface ApiKeyInputProps {
   onKeyVerified: (isVerified: boolean) => void;
