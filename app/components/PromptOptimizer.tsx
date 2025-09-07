@@ -1,493 +1,559 @@
 "use client";
 
-import { useEffect, useRef, useState } from 'react';
-import type React from 'react';
-import { FiArrowRight, FiCopy, FiCheckCircle, FiRefreshCw, FiSend, FiEdit2, FiTrash2 } from 'react-icons/fi';
-import { toast } from 'react-hot-toast';
-import * as CryptoJS from 'crypto-js';
-import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
+import {
+  useEffect,
+  useRef,
+  useState,
+  useCallback,
+  FormEvent,
+  KeyboardEvent,
+} from "react";
+import {
+  FiCopy,
+  FiCheckCircle,
+  FiRefreshCw,
+  FiSend,
+  FiEdit2,
+  FiTrash2,
+  FiPlus,
+  FiMessageSquare,
+  FiUser,
+  FiCpu,
+  FiMenu,
+} from "react-icons/fi";
+import { toast } from "react-hot-toast";
+import * as CryptoJS from "crypto-js";
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 
-const SECRET_KEY = 'uJioow3SoPYeAG3iEBRGlSAdFMi8C10AfZVrw3X_4dg=';
+const SECRET_KEY = "uJioow3SoPYeAG3iEBRGlSAdFMi8C10AfZVrw3X_4dg=";
 
 interface PromptOptimizerProps {
   apiKey?: string;
 }
 
 type ChatMessage = {
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   content: string;
   explanations?: string[];
 };
 
-export default function PromptOptimizer({ apiKey: apiKeyProp }: PromptOptimizerProps) {
-  // State management
-  const params = useParams<{ id?: string }>();
+export default function PromptOptimizer({
+  apiKey: apiKeyProp,
+}: PromptOptimizerProps) {
+  const params = useParams();
   const router = useRouter();
-  const sessionId = (params && (params as any).id) || '';
+  const sessionId = (params?.id as string) || "";
+
+  // State
   const [isLoading, setIsLoading] = useState(false);
   const [isApiKeyValid, setIsApiKeyValid] = useState(false);
-  const [apiKey, setApiKey] = useState(apiKeyProp || '');
-  const [input, setInput] = useState('');
-  const [optimizedPrompt, setOptimizedPrompt] = useState('');
+  const [apiKey, setApiKey] = useState(apiKeyProp || "");
+  const [input, setInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [copied, setCopied] = useState(false);
-  const FIXED_BACKEND_MODEL = 'gemini-1.5-flash';
-  const [sessions, setSessions] = useState<{ id: string; title: string; updatedAt: number }[]>([]);
-  const [showHistory, setShowHistory] = useState(true);
-  const chatRef = useRef<HTMLDivElement | null>(null);
+  const FIXED_BACKEND_MODEL = "gemini-1.5-flash";
+  const [sessions, setSessions] = useState<
+    { id: string; title: string; updatedAt: number }[]
+  >([]);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [loadingSession, setLoadingSession] = useState(true);
   const saveTimer = useRef<number | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingTitle, setEditingTitle] = useState('');
+  const [editingTitle, setEditingTitle] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  // Load API key from localStorage (decrypt)
-  const loadApiKeyFromStorage = () => {
+  // --- Core Logic ---
+
+  const loadApiKeyFromStorage = useCallback(() => {
+    if (typeof window === "undefined") return;
     try {
-      const saved = localStorage.getItem('gemini-api-key');
+      const saved = localStorage.getItem("gemini-api-key");
       if (!saved) return;
-      const decrypted = CryptoJS.AES.decrypt(saved, SECRET_KEY).toString(CryptoJS.enc.Utf8);
+      const decrypted = CryptoJS.AES.decrypt(saved, SECRET_KEY).toString(
+        CryptoJS.enc.Utf8
+      );
       if (decrypted) setApiKey(decrypted);
     } catch (e) {
-      console.error('Failed to load API key from storage', e);
+      console.error("Failed to load API key from storage", e);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (!apiKeyProp) {
       loadApiKeyFromStorage();
     }
-  }, [apiKeyProp]);
+  }, [apiKeyProp, loadApiKeyFromStorage]);
 
   useEffect(() => {
     setIsApiKeyValid(Boolean(apiKeyProp || apiKey));
   }, [apiKeyProp, apiKey]);
 
-  // Load session messages & list; reset state when switching sessions
   useEffect(() => {
+    if (typeof window === "undefined") return;
     try {
-      const rawList = localStorage.getItem('chat_sessions');
-      const listParsed: { id: string; title: string; updatedAt: number }[] = rawList ? JSON.parse(rawList) : [];
+      const rawList = localStorage.getItem("chat_sessions");
+      const listParsed: { id: string; title: string; updatedAt: number }[] =
+        rawList ? JSON.parse(rawList) : [];
       if (rawList) setSessions(listParsed);
 
-      // Clear current view before loading new session to avoid flashes
       setLoadingSession(true);
       setMessages([]);
-      setOptimizedPrompt('');
 
       if (sessionId) {
         const raw = localStorage.getItem(`chat:${sessionId}`);
         const data = raw ? JSON.parse(raw) : null;
-        const loadedMessages: ChatMessage[] = Array.isArray(data?.messages) ? data.messages : [];
-        const loadedOptimized: string = typeof data?.optimizedPrompt === 'string' ? data.optimizedPrompt : '';
+        const loadedMessages: ChatMessage[] = Array.isArray(data?.messages)
+          ? data.messages
+          : [];
         setMessages(loadedMessages);
-        setOptimizedPrompt(loadedOptimized);
       }
       setLoadingSession(false);
     } catch (e) {
-      console.warn('Failed to load session data', e);
+      console.warn("Failed to load session data", e);
       setLoadingSession(false);
     }
   }, [sessionId]);
 
-  // If we came from home quick-start, auto-run optimization once
-  useEffect(() => {
-    if (!sessionId || !isApiKeyValid || loadingSession) return;
-    try {
-      const key = `init_prompt:${sessionId}`;
-      const seed = localStorage.getItem(key);
-      if (seed && !messages.some(m=>m.role==='assistant')) {
-        setInput(seed);
-        localStorage.removeItem(key);
-        // fire and forget
-        handleOptimize(false);
-      }
-    } catch {}
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId, isApiKeyValid, loadingSession]);
+  const latestOptimizedPrompt =
+    messages.filter((m) => m.role === "assistant").slice(-1)[0]?.content || "";
 
-  // Persist session on change (debounced) — only when content actually exists and changes
+  // Debounced session saving
   useEffect(() => {
-    if (!sessionId || loadingSession) return;
+    if (typeof window === "undefined") return;
+    if (!sessionId || loadingSession || messages.length === 0) return;
+
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
     saveTimer.current = window.setTimeout(() => {
       try {
-        const hasContent = messages.length > 0 || Boolean(optimizedPrompt);
-        // If no content, ensure nothing is saved/persisted for this session
-        if (!hasContent) {
-          try { localStorage.removeItem(`chat:${sessionId}`); } catch {}
-          const raw = localStorage.getItem('chat_sessions');
-          const listParsed: { id: string; title: string; updatedAt: number }[] = raw ? JSON.parse(raw) : [];
-          const cleaned = listParsed.filter(s => s.id !== sessionId);
-          if (cleaned.length !== listParsed.length) {
-            localStorage.setItem('chat_sessions', JSON.stringify(cleaned));
-            setSessions(cleaned);
-          }
+        const existingRaw = localStorage.getItem(`chat:${sessionId}`);
+        const nextPayload = { messages };
+        if (
+          existingRaw &&
+          JSON.stringify(JSON.parse(existingRaw)) ===
+            JSON.stringify(nextPayload)
+        ) {
           return;
         }
-        // Compare with existing to avoid bumping updatedAt on mere load
-        const existingRaw = localStorage.getItem(`chat:${sessionId}`);
-        const existing = existingRaw ? JSON.parse(existingRaw) : null;
-        const nextPayload = { messages, optimizedPrompt };
-        const hasChanges = JSON.stringify(existing || {}) !== JSON.stringify(nextPayload);
 
-        if (hasChanges) {
-          localStorage.setItem(`chat:${sessionId}`, JSON.stringify(nextPayload));
+        localStorage.setItem(`chat:${sessionId}`, JSON.stringify(nextPayload));
 
-          // Update sessions list entry (title + updatedAt)
-          const firstUser = messages.find(m => m.role === 'user');
-          const title = (firstUser?.content || 'New Optimization').slice(0, 80);
-          const list = [...sessions];
-          const idx = list.findIndex(s => s.id === sessionId);
-          const entry = { id: sessionId, title, updatedAt: Date.now() };
-          if (idx >= 0) list[idx] = entry; else list.unshift(entry);
-          setSessions(list);
-          localStorage.setItem('chat_sessions', JSON.stringify(list));
-        }
+        const firstUser = messages.find((m) => m.role === "user");
+        const title = (firstUser?.content || "New Optimization").slice(0, 80);
+        const list = [...sessions];
+        const idx = list.findIndex((s) => s.id === sessionId);
+        const entry = { id: sessionId, title, updatedAt: Date.now() };
+
+        if (idx >= 0) list[idx] = entry;
+        else list.unshift(entry);
+
+        const sortedList = list.sort((a, b) => b.updatedAt - a.updatedAt);
+        setSessions(sortedList);
+        localStorage.setItem("chat_sessions", JSON.stringify(sortedList));
       } catch (e) {
-        console.warn('Failed to save session data', e);
+        console.warn("Failed to save session data", e);
       }
-    }, 200);
+    }, 500);
 
-    return () => { if (saveTimer.current) window.clearTimeout(saveTimer.current); };
-  }, [sessionId, messages, optimizedPrompt, loadingSession]);
+    return () => {
+      if (saveTimer.current) window.clearTimeout(saveTimer.current);
+    };
+  }, [sessionId, messages, loadingSession, sessions]);
 
-  // Inline rename + delete handlers for history items
-  const beginRename = (id: string, current: string) => {
-    setEditingId(id);
-    setEditingTitle(current);
-  };
-  const saveRename = (id: string) => {
-    const title = editingTitle.trim() || 'Untitled';
-    const list = [...sessions];
-    const idx = list.findIndex(s => s.id === id);
-    if (idx >= 0) {
-      list[idx] = { ...list[idx], title };
-      setSessions(list);
-      try { localStorage.setItem('chat_sessions', JSON.stringify(list)); } catch {}
-    }
-    setEditingId(null);
-    setEditingTitle('');
-  };
-  const cancelRename = () => { setEditingId(null); setEditingTitle(''); };
-  const deleteSession = (id: string) => {
-    const list = sessions.filter(s => s.id !== id);
-    setSessions(list);
-    try {
-      localStorage.setItem('chat_sessions', JSON.stringify(list));
-      localStorage.removeItem(`chat:${id}`);
-    } catch {}
-    if (id === sessionId) {
-      router.push('/');
-    }
-  };
-
-  // Core request function (handles both initial optimize and subsequent refinements)
   const handleOptimize = async (isRefinement = false, instruction?: string) => {
-    if (!isApiKeyValid) {
-      toast.error('Please enter a valid API key');
-      return;
-    }
+    if (!isApiKeyValid) return toast.error("Please enter a valid API key");
+    if (!isRefinement && !input.trim())
+      return toast.error("Please enter a prompt to optimize");
+    if (isRefinement && !(instruction || "").trim())
+      return toast.error("Please enter refinement instructions");
 
-    if (!isRefinement && !input.trim()) {
-      toast.error('Please enter a prompt to optimize');
-      return;
-    }
-
-    if (isRefinement && !(instruction || '').trim()) {
-      toast.error('Please enter refinement instructions');
-      return;
-    }
+    setIsLoading(true);
+    const userMessageContent = isRefinement ? instruction || "" : input.trim();
+    const currentMessages = [
+      ...messages,
+      { role: "user", content: userMessageContent },
+    ] as ChatMessage[];
+    setMessages(currentMessages);
+    setInput("");
 
     try {
-      setIsLoading(true);
-
       const payload: any = {
-        prompt: isRefinement ? optimizedPrompt : input,
-        model: FIXED_BACKEND_MODEL, // backend is fixed; platform selection is UI-only
+        prompt: isRefinement ? latestOptimizedPrompt : input,
+        model: FIXED_BACKEND_MODEL,
         apiKey,
       };
       if (isRefinement) {
         payload.refinementInstruction = instruction;
-        payload.previousPrompt = optimizedPrompt || input;
+        payload.previousPrompt = latestOptimizedPrompt || input;
       }
 
-      const response = await fetch('/api/gemini', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/gemini", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to process your request');
+        throw new Error(errorData.error || "Failed to process your request");
       }
 
       const data = await response.json();
-      const newOptimized = data.optimizedPrompt || '';
-      const newExplanations = data.explanations || [];
-      setOptimizedPrompt(newOptimized);
-      // Persist latest prompt
-      try { localStorage.setItem('optimized_prompt', newOptimized); } catch {}
+      const newAssistantMessage: ChatMessage = {
+        role: "assistant",
+        content: data.optimizedPrompt || "",
+        explanations: data.explanations || [],
+      };
 
-      // Update chat messages
-      if (!isRefinement) {
-        setMessages((prev) => [
-          ...prev,
-          { role: 'user', content: input.trim() },
-          { role: 'assistant', content: newOptimized, explanations: newExplanations },
-        ]);
-        setInput('');
-        toast.success('Prompt optimized');
-      } else {
-        setMessages((prev) => [
-          ...prev,
-          { role: 'user', content: instruction || '' },
-          { role: 'assistant', content: newOptimized, explanations: newExplanations },
-        ]);
-        toast.success('Prompt refined');
-      }
+      setMessages([...currentMessages, newAssistantMessage]);
+      toast.success(isRefinement ? "Prompt refined" : "Prompt optimized");
     } catch (error: any) {
-      console.error('Optimization error:', error);
-      toast.error(error.message || 'An error occurred while processing your request');
+      console.error("Optimization error:", error);
+      toast.error(error.message || "An error occurred");
+      setMessages(messages);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleSend = async (e: React.FormEvent) => {
+  const handleSend = (e: FormEvent) => {
     e.preventDefault();
-    const hasAssistantReply = messages.some(m => m.role === 'assistant');
-    if (!hasAssistantReply) {
-      await handleOptimize(false);
-    } else {
-      await handleOptimize(true, input);
-      setInput('');
-    }
+    if (!input.trim()) return;
+    const hasAssistantReply = messages.some((m) => m.role === "assistant");
+    handleOptimize(hasAssistantReply, input);
   };
 
   const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    toast.success('Copied to clipboard!');
-    setTimeout(() => setCopied(false), 2000);
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+      setCopied(true);
+      toast.success("Copied to clipboard!");
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
-
-  // Removed global optimized_prompt preload to keep prompts scoped per session
 
   const startNewOptimization = () => {
-    // Prevent creating multiple empty sessions; reuse current if empty
-    const hasContent = messages.length > 0 || Boolean(optimizedPrompt);
+    const hasContent = messages.length > 0;
     if (!hasContent && sessionId) {
-      // Focus compose area instead of creating a new one
-      chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight, behavior: 'smooth' });
-      toast('Compose your first message to start this chat');
+      toast("Compose your first message to start this chat");
+      textareaRef.current?.focus();
       return;
     }
-    router.push('/optimize');
+    router.push("/optimize");
   };
 
-  const goHomeAndRefresh = () => {
-    router.push('/');
-    if (typeof window !== 'undefined') {
-      setTimeout(() => window.location.reload(), 50);
+  const deleteSession = (id: string) => {
+    const list = sessions.filter((s) => s.id !== id);
+    setSessions(list);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("chat_sessions", JSON.stringify(list));
+        localStorage.removeItem(`chat:${id}`);
+      } catch {}
+    }
+    if (id === sessionId) {
+      router.push("/");
     }
   };
 
-  // Auto-scroll chat to bottom on new messages
+  const saveRename = (id: string) => {
+    const title = editingTitle.trim() || "Untitled";
+    const list = sessions.map((s) => (s.id === id ? { ...s, title } : s));
+    setSessions(list);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("chat_sessions", JSON.stringify(list));
+      } catch {}
+    }
+    setEditingId(null);
+    setEditingTitle("");
+  };
+
   useEffect(() => {
-    if (!chatRef.current) return;
-    chatRef.current.scrollTop = chatRef.current.scrollHeight;
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      const scrollHeight = textareaRef.current.scrollHeight;
+      const maxHeight = 200;
+      textareaRef.current.style.height = `${Math.min(
+        scrollHeight,
+        maxHeight
+      )}px`;
+    }
+  }, [input]);
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend(e as unknown as FormEvent);
+    }
+  };
+
+  // --- Render Components ---
+
+  const HistoryPanel = () => (
+    <aside className="flex flex-col h-full w-full max-w-sm p-4 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-lg border-r border-slate-200 dark:border-zinc-800">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-semibold">History</h2>
+        <button
+          onClick={startNewOptimization}
+          className="flex items-center gap-2 text-sm px-3 py-1.5 rounded-lg bg-indigo-600 text-white shadow-sm hover:bg-indigo-500 disabled:opacity-50 transition-colors"
+          aria-label="New Optimization"
+        >
+          <FiPlus /> New
+        </button>
+      </div>
+      {sessions.length === 0 ? (
+        <div className="text-center text-sm text-gray-400 mt-8">
+          No past chats yet.
+        </div>
+      ) : (
+        <ul className="space-y-2 overflow-y-auto flex-1">
+          {sessions.map((s) => (
+            <li key={s.id} className="group relative">
+              <Link
+                href={`/optimize/${s.id}`}
+                className={`block w-full text-left p-3 rounded-lg transition-colors ${
+                  s.id === sessionId
+                    ? "bg-blue-500/10 text-blue-600 dark:text-blue-300"
+                    : "hover:bg-slate-100 dark:hover:bg-zinc-800"
+                }`}
+              >
+                {editingId === s.id ? (
+                  <input
+                    value={editingTitle}
+                    onChange={(e) => setEditingTitle(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        saveRename(s.id);
+                      }
+                      if (e.key === "Escape") {
+                        setEditingId(null);
+                      }
+                    }}
+                    onBlur={() => saveRename(s.id)}
+                    autoFocus
+                    className="w-full bg-transparent border-b border-blue-400 focus:outline-none"
+                  />
+                ) : (
+                  <>
+                    <p className="font-medium truncate text-sm">
+                      {s.title || "Untitled"}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      {new Date(s.updatedAt).toLocaleString()}
+                    </p>
+                  </>
+                )}
+              </Link>
+              {editingId !== s.id && (
+                <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                  {confirmDeleteId === s.id ? (
+                    <>
+                      <button
+                        onClick={() => deleteSession(s.id)}
+                        className="p-2 rounded-md bg-red-500 text-white hover:bg-red-600 text-xs"
+                      >
+                        Confirm
+                      </button>
+                      <button
+                        onClick={() => setConfirmDeleteId(null)}
+                        className="p-2 rounded-md bg-slate-200 dark:bg-zinc-700 hover:bg-slate-300 dark:hover:bg-zinc-600 text-xs"
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => {
+                          setEditingId(s.id);
+                          setEditingTitle(s.title || "Untitled");
+                        }}
+                        className="p-2 rounded-md hover:bg-slate-200 dark:hover:bg-zinc-700"
+                        title="Rename"
+                      >
+                        <FiEdit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setConfirmDeleteId(s.id)}
+                        className="p-2 rounded-md text-red-500 hover:bg-red-500/10"
+                        title="Delete"
+                      >
+                        <FiTrash2 className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </aside>
+  );
+
   return (
-    <div className="min-h-screen p-4 md:p-8 bg-slate-50 text-slate-900 dark:bg-gradient-to-br dark:from-gray-900 dark:to-gray-800 dark:text-white transition-colors">
-      <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-4">
-        {/* History Sidebar */}
-        {showHistory && (
-        <aside id="history" className="lg:col-span-1 rounded-xl p-4 h-[78vh] overflow-y-auto bg-white border border-slate-200 dark:bg-gray-800/50 dark:border-gray-700" aria-busy={loadingSession}>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold">Context History</h2>
-            <button
-              onClick={startNewOptimization}
-              className="text-xs px-2 py-1 rounded bg-gradient-to-r from-cyan-500 to-indigo-600 text-white shadow-sm hover:from-cyan-400 hover:to-indigo-600 disabled:opacity-50"
-              aria-label="New chat"
-            >New</button>
-          </div>
-          {sessions.length === 0 ? (
-            <p className="text-sm text-gray-400">No past chats yet.</p>
+    <div className="min-h-screen flex bg-slate-50 text-slate-900 dark:bg-zinc-900 dark:text-white">
+      {/* Mobile History Drawer */}
+      <div
+        className={`fixed inset-0 z-30 bg-black/30 transition-opacity lg:hidden ${
+          isHistoryOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
+        onClick={() => setIsHistoryOpen(false)}
+      />
+      <div
+        className={`fixed top-0 left-0 h-full z-40 transition-transform lg:hidden ${
+          isHistoryOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <HistoryPanel />
+      </div>
+
+      {/* Desktop History Panel */}
+      <div className="hidden lg:flex lg:w-80 xl:w-96">
+        <HistoryPanel />
+      </div>
+
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col h-screen">
+        <header className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-zinc-800">
+          <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-indigo-600">
+            Prompt Optimizer
+          </h1>
+          <button
+            className="lg:hidden p-2 rounded-md hover:bg-slate-100 dark:hover:bg-zinc-800"
+            onClick={() => setIsHistoryOpen(true)}
+            aria-label="Open history"
+          >
+            <FiMenu />
+          </button>
+        </header>
+
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
+          {loadingSession ? (
+            <div className="flex justify-center items-center h-full text-gray-400">
+              Loading...
+            </div>
+          ) : messages.length === 0 ? (
+            <div className="text-center text-gray-400 h-full flex flex-col justify-center items-center">
+              <FiMessageSquare className="w-12 h-12 text-gray-500 mb-4" />
+              <h2 className="text-lg font-medium">Start a new optimization</h2>
+              <p>Enter your initial prompt below to begin.</p>
+            </div>
           ) : (
-            <ul className="space-y-2">
-              {[...sessions]
-                .sort((a,b)=>{
-                  if (b.updatedAt === a.updatedAt) return a.id.localeCompare(b.id);
-                  return b.updatedAt - a.updatedAt;
-                })
-                .map((s) => (
-                <li key={s.id} className="group">
-                  <div className={`flex items-center gap-2 w-full px-3 py-2 rounded-lg border text-sm bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60 border-slate-200 hover:bg-white dark:bg-gray-800/40 dark:border-gray-700 dark:hover:bg-gray-800 transition-all ${s.id===sessionId?'ring-2 ring-blue-500/30':''}`}>
-                    <Link href={`/optimize/${s.id}`} aria-current={s.id===sessionId ? 'page' : undefined} className="flex-1 text-left min-w-0">
-                      {editingId===s.id ? (
-                        <input
-                          value={editingTitle}
-                          onChange={(e)=>setEditingTitle(e.target.value)}
-                          onKeyDown={(e)=>{ if(e.key==='Enter'){ saveRename(s.id); } if(e.key==='Escape'){ cancelRename(); } }}
-                          onBlur={()=>saveRename(s.id)}
-                          autoFocus
-                          className="w-full bg-white/70 dark:bg-gray-900/20 border border-slate-300 dark:border-gray-700 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/30 shadow-sm"
-                          title="Rename chat"
-                        />
-                      ) : (
-                        <>
-                          <div className="truncate">{s.title || 'Untitled'}</div>
-                          <div className="text-xs text-gray-400">{new Date(s.updatedAt).toLocaleString()}</div>
-                        </>
-                      )}
-                    </Link>
-                    {editingId!==s.id && (
-                      <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                        {confirmDeleteId===s.id ? (
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={(e)=>{ e.preventDefault(); deleteSession(s.id); setConfirmDeleteId(null); }}
-                              className="px-2 py-1 rounded-md bg-red-500 text-white text-xs hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-400/40 shadow-sm"
-                              title="Confirm delete"
-                              aria-label={`Confirm delete ${s.title}`}
-                            >Delete</button>
-                            <button
-                              onClick={(e)=>{ e.preventDefault(); setConfirmDeleteId(null); }}
-                              className="px-2 py-1 rounded-md bg-slate-200 text-slate-800 text-xs hover:bg-slate-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-slate-400/30"
-                              title="Cancel"
-                            >Cancel</button>
-                          </div>
-                        ) : (
-                          <>
-                            <button
-                              onClick={(e)=>{ e.preventDefault(); beginRename(s.id, s.title || 'Untitled'); }}
-                              className="p-1.5 rounded-md hover:bg-slate-200/60 dark:hover:bg-gray-700/60 focus:outline-none focus:ring-2 focus:ring-cyan-400/30"
-                              aria-label={`Rename ${s.title}`}
-                              title="Rename"
+            <>
+              {messages.map((m, i) => (
+                <div
+                  key={`${m.role}-${i}`}
+                  className={`flex items-start gap-3 ${
+                    m.role === "user" ? "justify-end" : "justify-start"
+                  }`}
+                >
+                  {m.role === "assistant" && (
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center bg-gradient-to-br from-cyan-400 to-indigo-500 text-white shrink-0">
+                      <FiCpu className="w-5 h-5" />
+                    </div>
+                  )}
+                  <div
+                    className={`max-w-[85%] rounded-xl px-4 py-3 text-sm ${
+                      m.role === "user"
+                        ? "bg-blue-600 text-white"
+                        : "bg-white border border-slate-200 text-slate-800 dark:bg-zinc-800 dark:border-zinc-700 dark:text-gray-100"
+                    }`}
+                  >
+                    <pre className="whitespace-pre-wrap break-words font-sans">
+                      {m.content}
+                    </pre>
+                    {m.explanations && m.explanations.length > 0 && (
+                      <div className="mt-4 pt-3 border-t border-slate-200/50 dark:border-zinc-700/50">
+                        <h3 className="text-xs font-semibold mb-2 text-slate-600 dark:text-zinc-400">
+                          IMPROVEMENTS
+                        </h3>
+                        <ul className="space-y-2">
+                          {m.explanations.map((ex, idx) => (
+                            <li
+                              key={idx}
+                              className="flex items-start gap-2 text-slate-700 dark:text-gray-200"
                             >
-                              <FiEdit2 className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={(e)=>{ e.preventDefault(); setConfirmDeleteId(s.id); }}
-                              className="p-1.5 rounded-md hover:bg-red-50 text-red-600 dark:hover:bg-red-500/10 focus:outline-none focus:ring-2 focus:ring-red-400/30"
-                              aria-label={`Delete ${s.title}`}
-                              title="Delete"
-                            >
-                              <FiTrash2 className="w-4 h-4" />
-                            </button>
-                          </>
-                        )}
+                              <FiCheckCircle className="shrink-0 text-green-400 mt-0.5" />
+                              <span>{ex}</span>
+                            </li>
+                          ))}
+                        </ul>
                       </div>
                     )}
                   </div>
-                </li>
-              ))}
-            </ul>
-          )}
-          <div className="mt-4">
-            <button onClick={goHomeAndRefresh} className="w-full text-xs px-2 py-2 rounded bg-slate-200 hover:bg-slate-300 text-slate-800 border border-slate-300 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-100 dark:border-gray-600">Home & Refresh</button>
-          </div>
-        </aside>
-        )}
-
-        <div className="lg:col-span-3">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl md:text-3xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-600 drop-shadow-[0_0_12px_rgba(59,130,246,0.35)]">Prompt Optimizer</h1>
-          <button className="lg:hidden px-3 py-1.5 text-sm rounded-md bg-slate-200 hover:bg-slate-300 text-slate-800 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-100" onClick={()=>setShowHistory(v=>!v)} aria-expanded={showHistory} aria-controls="history">
-            {showHistory? 'Hide' : 'Show'} History
-          </button>
-        </div>
-
-        {/* Progress indicator during optimization/refinement */}
-        {isLoading && (
-          <div className="mb-3" aria-live="polite">
-            <div className="progress" role="progressbar" aria-label="Processing" aria-valuetext="Processing">
-              <div className="bar" />
-            </div>
-          </div>
-        )}
-
-        {/* Section: Conversation */}
-        <div className="mb-2 text-sm font-medium text-slate-600 dark:text-gray-300">Conversation</div>
-        {/* Chat window */}
-        <div ref={chatRef} className="rounded-xl p-4 h-[70vh] overflow-y-auto space-y-4 bg-white border border-slate-200 dark:bg-gray-800/50 dark:border-gray-700" aria-busy={loadingSession}>
-          {loadingSession ? (
-            <div className="text-center text-gray-400 py-12">Loading conversation…</div>
-          ) : messages.length === 0 ? (
-            <div className="text-center text-gray-400 py-12">
-              <FiArrowRight className="mx-auto w-8 h-8 text-gray-500 mb-2" />
-              Start by entering your prompt below. After the first optimization, continue refining with follow-up messages.
-            </div>
-          ) : (
-            messages.map((m, i) => {
-              const key = `${m.role}-${i}-${(m.content || '').slice(0, 24)}`;
-              return (
-              <div key={key} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[85%] rounded-lg px-4 py-3 text-sm ${m.role === 'user' ? 'bg-blue-600 text-white' : 'bg-slate-100 border border-slate-200 text-slate-800 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100'}`}>
-                  <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-relaxed">{m.content}</pre>
-                  {m.role === 'assistant' && m.explanations && m.explanations.length > 0 && (
-                    <ul className="mt-3 space-y-2">
-                      {m.explanations.map((ex, idx) => (
-                        <li key={idx} className="flex items-start space-x-2 text-slate-700 dark:text-gray-200">
-                          <FiCheckCircle className="shrink-0 text-green-400 w-4 h-4 mt-0.5" />
-                          <span className="text-sm leading-snug">{ex}</span>
-                        </li>
-                      ))}
-                    </ul>
+                  {m.role === "user" && (
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center bg-blue-600 text-white shrink-0">
+                      <FiUser className="w-5 h-5" />
+                    </div>
                   )}
                 </div>
-              </div>
-            );})
+              ))}
+              {isLoading && (
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center bg-gradient-to-br from-cyan-400 to-indigo-500 text-white shrink-0">
+                    <FiCpu className="w-5 h-5" />
+                  </div>
+                  <div className="px-4 py-3 rounded-xl text-sm bg-white border border-slate-200 text-slate-800 dark:bg-zinc-800 dark:border-zinc-700 dark:text-gray-100">
+                    Optimizing...
+                  </div>
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </>
           )}
         </div>
 
-        {/* Section: Current Optimized Prompt */}
-        {!loadingSession && optimizedPrompt && (
-          <div className="mt-4 rounded-xl p-4 bg-white border border-slate-200 dark:bg-gray-800/50 dark:border-gray-700">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="font-semibold">Current Optimized Prompt</h2>
-              <button onClick={() => copyToClipboard(optimizedPrompt)} className="flex items-center text-sm text-slate-600 hover:text-slate-800 dark:text-gray-300 dark:hover:text-white">
-                <FiCopy className="mr-1.5 w-4 h-4" />
-                {copied ? 'Copied!' : 'Copy'}
-              </button>
-            </div>
-            <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">{optimizedPrompt}</pre>
+        {latestOptimizedPrompt && (
+          <div className="p-4 flex gap-2 border-t border-slate-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-lg">
+            <button
+              onClick={() => copyToClipboard(latestOptimizedPrompt)}
+              className="flex-1 flex items-center justify-center gap-2 rounded-lg px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 transition-colors text-sm"
+            >
+              {copied ? <FiCheckCircle /> : <FiCopy />}
+              {copied ? "Copied" : "Copy Optimized Prompt"}
+            </button>
+            <button
+              onClick={() => handleOptimize(true, input)}
+              disabled={isLoading}
+              className="flex-1 flex items-center justify-center gap-2 rounded-lg px-3 py-2 bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50 transition-colors text-sm"
+            >
+              <FiRefreshCw /> Refine Again
+            </button>
           </div>
         )}
 
-        {/* Input composer */}
-        {/* Section: Compose */}
-        <div className="mt-6 mb-1 text-sm font-medium text-slate-600 dark:text-gray-300">Compose</div>
-        <form onSubmit={handleSend} className="mt-2 flex items-end space-x-2">
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e)=>{
-              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (input.trim()) handleSend(e as any); }
-              if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); if (input.trim()) handleSend(e as any); }
-            }}
-            placeholder={messages.some(m=>m.role==='assistant') ? 'Refinement instructions...' : 'Enter your prompt...'}
-            className="flex-1 h-24 p-3 rounded-xl bg-white border border-slate-300 text-slate-900 transition-all resize-none
-                       focus:outline-none focus:ring-4 focus:ring-cyan-400/30 focus:border-cyan-300
-                       hover:shadow-[0_0_16px_rgba(34,211,238,0.12)]
-                       dark:bg-gray-700/50 dark:border-gray-600 dark:text-gray-100 dark:focus:ring-cyan-400/20"
-            disabled={isLoading || !isApiKeyValid || loadingSession}
-          />
-          <button
-            type="submit"
-            disabled={isLoading || !isApiKeyValid || !input.trim() || loadingSession}
-            className="h-10 px-4 flex items-center justify-center rounded-xl text-white font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed
-                       bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-700 focus:ring-4 focus:ring-cyan-400/30"
-          >
-            {isLoading ? <FiRefreshCw className="animate-spin" /> : <FiSend />}
-          </button>
+        <form
+          onSubmit={handleSend}
+          className="p-4 border-t border-slate-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-lg"
+        >
+          <div className="flex items-end gap-2">
+            <textarea
+              ref={textareaRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Enter a prompt to optimize..."
+              className="flex-1 resize-none rounded-lg border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              rows={1}
+            />
+            <button
+              type="submit"
+              disabled={isLoading || !input.trim()}
+              className="shrink-0 px-4 py-3 rounded-lg bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50 transition-colors flex items-center gap-2"
+            >
+              <FiSend /> Send
+            </button>
+          </div>
         </form>
-        </div>
-      </div>
+      </main>
     </div>
   );
 }

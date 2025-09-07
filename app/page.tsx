@@ -1,8 +1,8 @@
 "use client";
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { FiEdit2, FiTrash2 } from 'react-icons/fi';
+import { useEffect, useState, useRef } from 'react';
+import { FiEdit2, FiTrash2, FiSend, FiSettings, FiClock, FiZap, FiChevronRight, FiGrid, FiList } from 'react-icons/fi';
 import { useRouter } from 'next/navigation';
 import * as CryptoJS from 'crypto-js';
 
@@ -17,6 +17,9 @@ export default function Home() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [searchFilter, setSearchFilter] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const router = useRouter();
 
   const newId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -34,7 +37,19 @@ export default function Home() {
       const raw = localStorage.getItem('chat_sessions');
       if (raw) setSessions(JSON.parse(raw));
     } catch {}
+    
+    // Load view preference
+    const savedView = localStorage.getItem('view_mode');
+    if (savedView === 'list') setViewMode('list');
   }, []);
+
+  useEffect(() => {
+    // Auto-resize textarea
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 200) + 'px';
+    }
+  }, [homeInput]);
 
   const persistSessions = (list: typeof sessions) => {
     setSessions(list);
@@ -49,12 +64,10 @@ export default function Home() {
     setIsStarting(true);
     const id = newId();
     try {
-      // Load and decrypt API key
       const saved = localStorage.getItem('gemini-api-key');
       const decrypted = saved ? CryptoJS.AES.decrypt(saved, SECRET_KEY).toString(CryptoJS.enc.Utf8) : '';
       if (!decrypted) { router.push('/settings'); return; }
 
-      // Call optimizer API directly
       const res = await fetch('/api/gemini', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -66,20 +79,17 @@ export default function Home() {
       const optimizedPrompt: string = data?.optimizedPrompt || '';
       const explanations: string[] = Array.isArray(data?.explanations) ? data.explanations : [];
 
-      // Persist full session so the session page loads instantly with results
       const messages = [
         { role: 'user', content: text },
         { role: 'assistant', content: optimizedPrompt, explanations },
       ];
       try { localStorage.setItem(`chat:${id}`, JSON.stringify({ messages, optimizedPrompt })); } catch {}
 
-      // Update sessions list
       const title = text.slice(0, 80);
       const list = [{ id, title, updatedAt: Date.now() }, ...sessions.filter(s => s.id !== id)];
       setSessions(list);
       try { localStorage.setItem('chat_sessions', JSON.stringify(list)); } catch {}
 
-      // Navigate to the session
       router.push(`/optimize/${id}`);
     } catch (e: any) {
       console.error('Start from home failed', e);
@@ -103,133 +113,275 @@ export default function Home() {
     setEditingId(id);
     setEditingTitle(current);
   };
+  
   const saveRename = (id: string) => {
     const list = sessions.map(s => s.id === id ? { ...s, title: editingTitle } : s);
     persistSessions(list);
     setEditingId(null);
     setEditingTitle('');
   };
+  
   const deleteSession = (id: string) => {
     const list = sessions.filter(s => s.id !== id);
     persistSessions(list);
     try { localStorage.removeItem(`chat:${id}`); } catch {}
+    setConfirmDeleteId(null);
+  };
+
+  const toggleViewMode = () => {
+    const newMode = viewMode === 'grid' ? 'list' : 'grid';
+    setViewMode(newMode);
+    localStorage.setItem('view_mode', newMode);
+  };
+
+  const filteredSessions = sessions.filter(s => 
+    s.title.toLowerCase().includes(searchFilter.toLowerCase())
+  );
+
+  const formatRelativeTime = (timestamp: number) => {
+    const diff = Date.now() - timestamp;
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+    
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    if (days < 30) return `${days}d ago`;
+    return new Date(timestamp).toLocaleDateString();
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-6 md:p-8">
-      <div className="w-full max-w-4xl text-center">
-        <h1
-          className="text-5xl md:text-6xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-600 select-none transition-transform duration-200 hover:scale-[1.01] drop-shadow-[0_0_18px_rgba(59,130,246,0.45)]"
-          aria-label="Prompt Optimizer"
-        >
-          Prompt Optimizer
-        </h1>
-        <p className="mt-3 text-slate-600 dark:text-gray-300">Optimize a prompt, then refine with follow-ups.</p>
-
-        {/* Quick start input */}
-        <div className="mt-8 flex items-end space-x-2 text-left">
-          <textarea
-            value={homeInput}
-            onChange={(e)=>setHomeInput(e.target.value)}
-            onKeyDown={(e)=>{ if (e.key==='Enter' && !e.shiftKey){ e.preventDefault(); handleStartFromHome(); } }}
-            placeholder={hasKey?"Enter your prompt to optimize...":"Enter API key first in Settings"}
-            className="flex-1 h-28 p-4 rounded-xl bg-white/90 border border-slate-300 text-slate-900 shadow-sm transition-all resize-none
-                       focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-cyan-400/40 focus-visible:border-cyan-300
-                       hover:shadow-[0_0_20px_rgba(34,211,238,0.15)]
-                       dark:bg-gray-800/60 dark:border-gray-700 dark:text-gray-100 dark:focus-visible:ring-cyan-400/30"
-            aria-label="Enter your prompt"
-          />
-          <button
-            onClick={handleStartFromHome}
-            disabled={!homeInput.trim() || isStarting}
-            className="h-12 px-5 rounded-xl bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-600 text-white font-semibold shadow-md
-                       hover:from-cyan-400 hover:to-indigo-500 active:scale-[0.99]
-                       disabled:opacity-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-cyan-400/30"
-            aria-label="Start optimization"
-          >{isStarting ? 'Optimizing…' : 'Start'}</button>
+    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-cyan-50/30 dark:from-gray-950 dark:via-gray-900 dark:to-cyan-950/20">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12 max-w-7xl">
+        {/* Header Section */}
+        <div className="text-center mb-10 md:mb-14">
+          <div className="inline-flex items-center gap-2 px-3 py-1 mb-6 text-xs font-medium text-cyan-700 bg-cyan-100/80 rounded-full backdrop-blur-sm dark:bg-cyan-900/30 dark:text-cyan-300">
+            <FiZap className="w-3 h-3" />
+            AI-Powered Optimization
+          </div>
+          
+          <h1 className="text-4xl sm:text-5xl md:text-7xl font-black bg-clip-text text-transparent bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 dark:from-cyan-400 dark:via-blue-400 dark:to-indigo-400 tracking-tight animate-gradient-x">
+            Prompt Optimizer
+          </h1>
+          
+          <p className="mt-4 text-base md:text-lg text-slate-600 dark:text-gray-400 max-w-2xl mx-auto">
+            Transform your prompts into high-performance instructions with AI-driven optimization
+          </p>
         </div>
 
-        {/* Minimal helper text */}
-        <p className="mt-3 text-xs text-gray-500">Press Enter to start, Shift+Enter for newline.</p>
-
-        <div className="mt-6 text-sm text-slate-600 dark:text-gray-400">
-          {hasKey ? 'API key detected. You can optimize or refine.' : 'No API key found. Please complete setup first.'}
-        </div>
-
-        <div className="mt-10 w-full text-left">
-          <h2 className="text-xl font-semibold mb-3">Past Optimizations</h2>
-          {sessions.length === 0 ? (
-            <p className="text-gray-400">No past sessions yet. Start a <Link className="text-blue-400 hover:underline" href={hasKey?"/optimize":"/settings"}>new optimization</Link>.</p>
-          ) : (
-            <ul className="space-y-2">
-              {sessions.map((s, idx) => (
-                <li
-                  key={s.id}
-                  draggable
-                  onDragStart={()=>onDragStart(idx)}
-                  onDragOver={(e)=>e.preventDefault()}
-                  onDrop={()=>onDrop(idx)}
-                  className="flex items-center justify-between p-3 border rounded-lg cursor-move bg-white border-slate-200 hover:bg-slate-50
-                             dark:bg-gray-800/50 dark:border-gray-700 dark:hover:bg-gray-800 transition-colors glow"
+        {/* Main Input Card */}
+        <div className="relative mb-12">
+          <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/20 via-blue-500/20 to-indigo-500/20 blur-3xl" />
+          <div className="relative bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200/50 dark:border-gray-800/50 p-6 md:p-8">
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between mb-2">
+                <label htmlFor="prompt-input" className="text-sm font-semibold text-slate-700 dark:text-gray-300">
+                  Enter your prompt
+                </label>
+                {!hasKey && (
+                  <Link href="/settings" className="inline-flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 hover:underline">
+                    <FiSettings className="w-3 h-3" />
+                    Add API Key
+                  </Link>
+                )}
+              </div>
+              
+              <div className="relative">
+                <textarea
+                  ref={textareaRef}
+                  id="prompt-input"
+                  value={homeInput}
+                  onChange={(e) => setHomeInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleStartFromHome();
+                    }
+                  }}
+                  placeholder={hasKey ? "Describe what you want to achieve with your prompt..." : "Please add your API key in Settings first"}
+                  disabled={!hasKey}
+                  className="w-full min-h-[120px] max-h-[200px] p-4 pr-14 text-base rounded-xl bg-slate-50 dark:bg-gray-800 border-2 border-transparent
+                           text-slate-900 dark:text-gray-100 transition-all duration-200 resize-none
+                           placeholder:text-slate-400 dark:placeholder:text-gray-500
+                           focus:outline-none focus:border-cyan-500 focus:bg-white dark:focus:bg-gray-900
+                           hover:border-slate-300 dark:hover:border-gray-700
+                           disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+                
+                <button
+                  onClick={handleStartFromHome}
+                  disabled={!homeInput.trim() || isStarting || !hasKey}
+                  className="absolute bottom-3 right-3 p-2.5 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600
+                           text-white shadow-lg transition-all duration-200
+                           hover:from-cyan-600 hover:to-blue-700 hover:shadow-xl hover:scale-105
+                           active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100
+                           focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+                  aria-label="Optimize prompt"
                 >
-                  <button
-                    onClick={()=>router.push(`/optimize/${s.id}`)}
-                    className="flex-1 text-left pr-3"
+                  <FiSend className={`w-5 h-5 ${isStarting ? 'animate-pulse' : ''}`} />
+                </button>
+              </div>
+              
+              <div className="flex items-center justify-between text-xs text-slate-500 dark:text-gray-500">
+                <span>Press Enter to optimize • Shift+Enter for new line</span>
+                <span>{homeInput.length}/1000</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Sessions Section */}
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-gray-100">
+              Past Optimizations
+            </h2>
+            
+            {sessions.length > 0 && (
+              <div className="flex items-center gap-3">
+                <input
+                  type="text"
+                  placeholder="Search sessions..."
+                  value={searchFilter}
+                  onChange={(e) => setSearchFilter(e.target.value)}
+                  className="px-3 py-2 text-sm rounded-lg bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700
+                           focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                />
+                
+                <button
+                  onClick={toggleViewMode}
+                  className="p-2 rounded-lg bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700
+                           hover:bg-slate-50 dark:hover:bg-gray-750 transition-colors"
+                  aria-label="Toggle view mode"
+                >
+                  {viewMode === 'grid' ? <FiList className="w-4 h-4" /> : <FiGrid className="w-4 h-4" />}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {filteredSessions.length === 0 ? (
+            <div className="text-center py-12 px-6 bg-white/50 dark:bg-gray-900/50 rounded-2xl border border-dashed border-slate-300 dark:border-gray-700">
+              <div className="max-w-sm mx-auto">
+                <FiClock className="w-12 h-12 mx-auto mb-4 text-slate-400 dark:text-gray-600" />
+                <h3 className="text-lg font-semibold text-slate-700 dark:text-gray-300 mb-2">
+                  {searchFilter ? 'No matching sessions' : 'No optimizations yet'}
+                </h3>
+                <p className="text-sm text-slate-500 dark:text-gray-500 mb-4">
+                  {searchFilter ? 'Try adjusting your search' : 'Start by entering a prompt above to optimize it'}
+                </p>
+                {!searchFilter && (
+                  <Link
+                    href={hasKey ? "#" : "/settings"}
+                    onClick={hasKey ? (e) => { e.preventDefault(); textareaRef.current?.focus(); } : undefined}
+                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-cyan-500 to-blue-600 rounded-lg
+                             hover:from-cyan-600 hover:to-blue-700 transition-all duration-200"
                   >
-                    {editingId===s.id ? (
+                    {hasKey ? 'Start Optimizing' : 'Setup API Key'}
+                    <FiChevronRight className="w-4 h-4" />
+                  </Link>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className={viewMode === 'grid' ? 
+              'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4' : 
+              'space-y-3'
+            }>
+              {filteredSessions.map((session, idx) => (
+                <div
+                  key={session.id}
+                  draggable
+                  onDragStart={() => onDragStart(idx)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => onDrop(idx)}
+                  className={`group relative bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-800
+                           hover:border-cyan-300 dark:hover:border-cyan-700 hover:shadow-xl
+                           transition-all duration-200 cursor-move overflow-hidden
+                           ${viewMode === 'grid' ? 'p-5' : 'p-4'}`}
+                >
+                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  
+                  {editingId === session.id ? (
+                    <div className="space-y-3">
                       <input
                         value={editingTitle}
-                        onChange={(e)=>setEditingTitle(e.target.value)}
-                        onKeyDown={(e)=>{ if(e.key==='Enter') saveRename(s.id); }}
-                        className="w-full rounded px-2 py-1 text-sm bg-white border border-slate-300 text-slate-900 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-cyan-400/30"
+                        onChange={(e) => setEditingTitle(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') saveRename(session.id); }}
+                        className="w-full px-3 py-2 text-sm rounded-lg bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700
+                                 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                        autoFocus
                       />
-                    ) : (
-                      <div className="truncate text-sm text-slate-800 dark:text-gray-100">{s.title || 'Untitled'}</div>
-                    )}
-                    <div className="text-xs text-slate-500 dark:text-gray-400">{new Date(s.updatedAt).toLocaleString()}</div>
-                  </button>
-                  <div className="flex items-center gap-2">
-                    {editingId===s.id ? (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => saveRename(session.id)}
+                          className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={() => { setEditingId(null); setEditingTitle(''); }}
+                          className="flex-1 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-gray-300 bg-slate-100 dark:bg-gray-800 rounded-lg hover:bg-slate-200 dark:hover:bg-gray-700"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : confirmDeleteId === session.id ? (
+                    <div className="space-y-3">
+                      <p className="text-sm font-medium text-slate-700 dark:text-gray-300">Delete this session?</p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => deleteSession(session.id)}
+                          className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-red-600 rounded-lg hover:bg-red-700"
+                        >
+                          Delete
+                        </button>
+                        <button
+                          onClick={() => setConfirmDeleteId(null)}
+                          className="flex-1 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-gray-300 bg-slate-100 dark:bg-gray-800 rounded-lg hover:bg-slate-200 dark:hover:bg-gray-700"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
                       <button
-                        onClick={()=>saveRename(s.id)}
-                        className="px-2 py-1 rounded-md bg-blue-600 text-white text-xs hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400/40"
-                        title="Save name"
-                      >Save</button>
-                    ) : confirmDeleteId===s.id ? (
-                      <>
+                        onClick={() => router.push(`/optimize/${session.id}`)}
+                        className="w-full text-left"
+                      >
+                        <h3 className="font-semibold text-slate-900 dark:text-gray-100 line-clamp-2 mb-2 group-hover:text-cyan-600 dark:group-hover:text-cyan-400 transition-colors">
+                          {session.title || 'Untitled Session'}
+                        </h3>
+                        <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-gray-500">
+                          <FiClock className="w-3 h-3" />
+                          <span>{formatRelativeTime(session.updatedAt)}</span>
+                        </div>
+                      </button>
+                      
+                      <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
-                          onClick={()=>{ deleteSession(s.id); setConfirmDeleteId(null); }}
-                          className="px-2 py-1 rounded-md bg-red-500 text-white text-xs hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-400/40"
-                          title="Confirm delete"
-                        >Delete</button>
-                        <button
-                          onClick={()=>setConfirmDeleteId(null)}
-                          className="px-2 py-1 rounded-md bg-slate-200 text-slate-800 text-xs hover:bg-slate-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-slate-400/30"
-                          title="Cancel"
-                        >Cancel</button>
-                      </>
-                    ) : (
-                      <>
-                        <button
-                          onClick={()=>requestRename(s.id, s.title)}
-                          className="p-1.5 rounded-md hover:bg-slate-200/60 dark:hover:bg-gray-700/60 focus:outline-none focus:ring-2 focus:ring-cyan-400/30"
-                          title="Rename"
+                          onClick={(e) => { e.stopPropagation(); requestRename(session.id, session.title); }}
+                          className="p-1.5 rounded-lg bg-white/90 dark:bg-gray-800/90 hover:bg-slate-100 dark:hover:bg-gray-700 transition-colors"
+                          aria-label="Rename"
                         >
-                          <FiEdit2 className="w-4 h-4" />
+                          <FiEdit2 className="w-3.5 h-3.5" />
                         </button>
                         <button
-                          onClick={()=>setConfirmDeleteId(s.id)}
-                          className="p-1.5 rounded-md hover:bg-red-50 text-red-600 dark:hover:bg-red-500/10 focus:outline-none focus:ring-2 focus:ring-red-400/30"
-                          title="Delete"
+                          onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(session.id); }}
+                          className="p-1.5 rounded-lg bg-white/90 dark:bg-gray-800/90 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 transition-colors"
+                          aria-label="Delete"
                         >
-                          <FiTrash2 className="w-4 h-4" />
+                          <FiTrash2 className="w-3.5 h-3.5" />
                         </button>
-                      </>
-                    )}
-                  </div>
-                </li>
+                      </div>
+                    </>
+                  )}
+                </div>
               ))}
-            </ul>
+            </div>
           )}
         </div>
       </div>

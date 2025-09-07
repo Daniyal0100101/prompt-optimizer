@@ -1,88 +1,125 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenerativeAI, GenerationConfig } from '@google/generative-ai';
+import { NextRequest, NextResponse } from "next/server";
+import { GoogleGenAI } from "@google/genai";
 
 export async function POST(req: NextRequest) {
   try {
-    const { prompt, model, apiKey, previousPrompt, refinementInstruction } = await req.json();
+
+    // --- parse and validate request body ---
+    const body = await req.json();
+    const { prompt, model, apiKey, previousPrompt, refinementInstruction } =
+      body;
 
     if ((!prompt && !previousPrompt) || !model || !apiKey) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+      return NextResponse.json(
+        {
+          error:
+            "Missing required fields: prompt/previousPrompt, model, or apiKey",
+        },
+        { status: 400 }
+      );
     }
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    
-    const resolvedModel = typeof model === 'string' && model.trim() ? model : 'gemini-1.5-flash';
-    const supportsSchema = /1\.5/.test(resolvedModel);
-    const generationConfig: GenerationConfig = supportsSchema
-      ? {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: "object",
-            properties: {
-              optimizedPrompt: { type: "string" },
-              explanations: { type: "array", items: { type: "string" } },
-            },
-            required: ["optimizedPrompt", "explanations"],
-          } as any,
+    const genAI = new GoogleGenAI({ apiKey });
+
+    const resolvedModel =
+      typeof model === "string" && model.trim()
+        ? model.trim()
+        : "gemini-2.0-flash";
+    const supportsSchema = /1\.5|2\./.test(resolvedModel);
+
+    // --- construct prompt based on whether it's an initial optimization or a refinement ---
+    const fullPrompt =
+      refinementInstruction && previousPrompt
+        ? `
+        You are a prompt engineering expert specializing in iterative refinement for large language models.
+        Existing prompt: "${previousPrompt}"
+        User feedback: "${refinementInstruction}"
+
+        Refine the prompt by analyzing the feedback and making targeted, meaningful changes. Do not append the instruction verbatim—integrate it thoughtfully to enhance clarity, specificity, and effectiveness. Consider adding role-playing, step-by-step reasoning (e.g., chain-of-thought), examples, or output formatting if they address the feedback and improve results.
+
+        Output strictly as JSON: {
+          "optimizedPrompt": "The refined prompt as a single, cohesive string.",
+          "explanations": ["Brief explanation of change 1 and why it improves the prompt.", "Explanation of change 2, etc."]
         }
-      : {
-          // Fallback for models without schema support
-          responseMimeType: "application/json",
-        };
+        Ensure explanations are concise, actionable, and directly linked to the feedback.
+      `
+        : `
+        You are a prompt engineering expert for large language models.
+        User input: "${prompt}"
 
-    const geminiModel = genAI.getGenerativeModel({ model: resolvedModel, generationConfig });
+        Transform this into an optimized prompt: Make it clear, concise, and high-impact. Use techniques like assigning a role to the AI, providing context, specifying exact output format (e.g., JSON, bullet points), including few-shot examples if helpful, or guiding step-by-step thinking to leverage the model's strengths.
 
-    const fullPrompt = refinementInstruction && previousPrompt
-    ? `
-      You are an expert in crafting prompts for Large Language Models.
-      Your task is to refine an existing prompt based on user feedback.
-      The target model for the optimized prompt is: ${model}.
-      The existing prompt is: "${previousPrompt}"
-      The user's refinement instruction is: "${refinementInstruction}"
+        Output strictly as JSON: {
+          "optimizedPrompt": "The fully optimized prompt as a single string.",
+          "explanations": ["Specific improvement 1 and its benefit.", "Improvement 2, etc."]
+        }
+        Focus on eliciting precise, creative, and reliable responses from the model.
+      `;
 
-      Your response must be a JSON object with two keys:
-      1. "optimizedPrompt": A string containing the newly refined prompt.
-      2. "explanations": An array of strings, where each string explains a change made based on the refinement instruction.
+    const contents = [{ role: "user", parts: [{ text: fullPrompt }] }];
 
-      Incorporate the user's feedback to improve the prompt. Do not simply append the instruction.
-    `
-    : `
-      You are an expert in crafting prompts for Large Language Models.
-      Your task is to take a user's raw instructions and transform them into a highly effective and optimized prompt for the ${model} model.
-      The user's instructions are: "${prompt}"
+    // --- configure response schema if supported by the model ---
+    const config: any = {};
+    if (supportsSchema) {
+      config.responseMimeType = "application/json";
+      config.responseSchema = {
+        type: "object",
+        properties: {
+          optimizedPrompt: { type: "string" },
+          explanations: { type: "array", items: { type: "string" } },
+        },
+        required: ["optimizedPrompt", "explanations"],
+      };
+    } else {
+      config.responseMimeType = "application/json";
+    }
 
-      Your response must be a JSON object with two keys:
-      1. "optimizedPrompt": A string containing the new, improved prompt.
-      2. "explanations": An array of strings, where each string is a brief explanation of a specific change or improvement you made.
+    const result = await genAI.models.generateContent({
+      model: resolvedModel,
+      contents,
+      config,
+    });
 
-      The new prompt should be clear, concise, and structured to elicit the best possible response from the ${model} model.
-      Follow best practices for prompt engineering, such as providing clear context, using strong action verbs, and specifying the desired format for the output.
-    `;
+    // --- parse and clean up the response ---
+    const text = result.text;
 
-    const result = await geminiModel.generateContent(fullPrompt);
-    const response = await result.response;
-    let text = response.text();
-    // Try to parse JSON, strip code fences if present
+    if (!text) {
+      return NextResponse.json({
+        optimizedPrompt: "",
+        explanations: ["No response text provided."],
+      });
+    }
+
     try {
       return NextResponse.json(JSON.parse(text));
-    } catch (_) {
-      // Remove ```json ... ``` or ``` ... ``` fences (no dotAll flag to support older targets)
-      const stripped = text
-        .replace(/^```json[\s\S]*?\n/, '')
-        .replace(/^```[\s\S]*?\n/, '')
-        .replace(/```$/g, '')
-        .trim();
+    } catch {
+      const stripped =
+        text
+          ?.replace(/^```json\s*\n?/, "")
+          .replace(/^```\s*\n?/, "")
+          .replace(/\s*```$/, "")
+          .trim() ?? "";
+
       try {
         return NextResponse.json(JSON.parse(stripped));
-      } catch (_) {
-        // As a last resort, return the raw text as optimizedPrompt
-        return NextResponse.json({ optimizedPrompt: stripped || text, explanations: [] });
+      } catch {
+        return NextResponse.json({
+          optimizedPrompt: stripped || text || "",
+          explanations: [
+            "Unable to parse structured response; using raw output.",
+          ],
+        });
       }
     }
-
+    // --- end response parsing ---
   } catch (error: any) {
-    console.error('Error in Gemini API route:', error);
-    const message = error?.message || 'Internal Server Error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("Error in GenAI API route:", error);
+    return NextResponse.json(
+      {
+        error:
+          error?.status?.message || error?.message || "Internal Server Error",
+      },
+      { status: error?.status || 500 }
+    );
   }
 }
