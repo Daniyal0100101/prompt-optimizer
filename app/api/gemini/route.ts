@@ -1,10 +1,39 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 
+async function generateWithRetry(
+  genAI: any,
+  resolvedModel: string,
+  contents: any,
+  config: any,
+  retries = 3,
+  delay = 800
+) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      return await genAI.models.generateContent({
+        model: resolvedModel,
+        contents,
+        config,
+      });
+    } catch (err: any) {
+      const retriable = [429, 500, 503];
+      if (retriable.includes(err?.status) && attempt < retries) {
+        console.warn(
+          `GenAI transient error (status=${err.status}). Retrying attempt ${attempt}/${retries} after ${
+            delay * attempt
+          }ms.`
+        );
+        await new Promise((res) => setTimeout(res, delay * attempt));
+        continue;
+      }
+      throw err;
+    }
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
-
-    // --- parse and validate request body ---
     const body = await req.json();
     const { prompt, model, apiKey, previousPrompt, refinementInstruction } =
       body;
@@ -27,7 +56,6 @@ export async function POST(req: NextRequest) {
         : "gemini-2.0-flash";
     const supportsSchema = /1\.5|2\./.test(resolvedModel);
 
-    // --- construct prompt based on whether it's an initial optimization or a refinement ---
     const fullPrompt =
       refinementInstruction && previousPrompt
         ? `
@@ -35,30 +63,27 @@ export async function POST(req: NextRequest) {
         Existing prompt: "${previousPrompt}"
         User feedback: "${refinementInstruction}"
 
-        Refine the prompt by analyzing the feedback and making targeted, meaningful changes. Do not append the instruction verbatim—integrate it thoughtfully to enhance clarity, specificity, and effectiveness. Consider adding role-playing, step-by-step reasoning (e.g., chain-of-thought), examples, or output formatting if they address the feedback and improve results.
+        Refine the prompt by analyzing the feedback and making targeted, meaningful changes. Do not append the instruction verbatim—integrate it thoughtfully. Ensure clarity, specificity, and effectiveness.
 
         Output strictly as JSON: {
           "optimizedPrompt": "The refined prompt as a single, cohesive string.",
-          "explanations": ["Brief explanation of change 1 and why it improves the prompt.", "Explanation of change 2, etc."]
+          "explanations": ["Brief explanation of change 1.", "Explanation of change 2."]
         }
-        Ensure explanations are concise, actionable, and directly linked to the feedback.
       `
         : `
         You are a prompt engineering expert for large language models.
         User input: "${prompt}"
 
-        Transform this into an optimized prompt: Make it clear, concise, and high-impact. Use techniques like assigning a role to the AI, providing context, specifying exact output format (e.g., JSON, bullet points), including few-shot examples if helpful, or guiding step-by-step thinking to leverage the model's strengths.
+        Transform this into an optimized prompt: Make it clear, concise, and high-impact. Use techniques like role assignment, context, output format, few-shot examples, or step-by-step guidance.
 
         Output strictly as JSON: {
           "optimizedPrompt": "The fully optimized prompt as a single string.",
-          "explanations": ["Specific improvement 1 and its benefit.", "Improvement 2, etc."]
+          "explanations": ["Specific improvement 1.", "Improvement 2."]
         }
-        Focus on eliciting precise, creative, and reliable responses from the model.
       `;
 
     const contents = [{ role: "user", parts: [{ text: fullPrompt }] }];
 
-    // --- configure response schema if supported by the model ---
     const config: any = {};
     if (supportsSchema) {
       config.responseMimeType = "application/json";
@@ -74,13 +99,9 @@ export async function POST(req: NextRequest) {
       config.responseMimeType = "application/json";
     }
 
-    const result = await genAI.models.generateContent({
-      model: resolvedModel,
-      contents,
-      config,
-    });
+    // --- call model with retry ---
+    const result = await generateWithRetry(genAI, resolvedModel, contents, config);
 
-    // --- parse and clean up the response ---
     const text = result.text;
 
     if (!text) {
@@ -90,14 +111,15 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // --- try parsing JSON safely ---
     try {
       return NextResponse.json(JSON.parse(text));
     } catch {
       const stripped =
         text
-          ?.replace(/^```json\s*\n?/, "")
-          .replace(/^```\s*\n?/, "")
-          .replace(/\s*```$/, "")
+          ?.replace(/^```json\s*/i, "")
+          .replace(/^```/, "")
+          .replace(/```$/, "")
           .trim() ?? "";
 
       try {
@@ -111,13 +133,12 @@ export async function POST(req: NextRequest) {
         });
       }
     }
-    // --- end response parsing ---
   } catch (error: any) {
     console.error("Error in GenAI API route:", error);
     return NextResponse.json(
       {
         error:
-          error?.status?.message || error?.message || "Internal Server Error",
+          error?.message || error?.status?.message || "Internal Server Error",
       },
       { status: error?.status || 500 }
     );
