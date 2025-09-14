@@ -1,7 +1,7 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
-  darkMode: 'class',
+  darkMode: "class",
   content: [
     "./pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -10,11 +10,11 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        'primary': '#1a1a1a',
-        'secondary': '#2a2a2a',
-        'accent': '#3a86ff',
-        'text-primary': '#ffffff',
-        'text-secondary': '#b3b3b3',
+        primary: "#1a1a1a",
+        secondary: "#2a2a2a",
+        accent: "#3a86ff",
+        "text-primary": "#ffffff",
+        "text-secondary": "#b3b3b3",
       },
       backgroundImage: {
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",

@@ -20,11 +20,15 @@ import {
   FiUser,
   FiCpu,
   FiMenu,
+  FiX,
+  FiHome,
+  FiSettings,
 } from "react-icons/fi";
 import { toast } from "react-hot-toast";
 import * as CryptoJS from "crypto-js";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { getSelectedModel } from "../utils/modelConfig";
 
 const SECRET_KEY = "uJioow3SoPYeAG3iEBRGlSAdFMi8C10AfZVrw3X_4dg=";
 
@@ -48,10 +52,11 @@ export default function PromptOptimizer({
   // State
   const [isLoading, setIsLoading] = useState(false);
   const [isApiKeyValid, setIsApiKeyValid] = useState(false);
+  const [selectedModel, setSelectedModel] = useState<string>("");
   const [apiKey, setApiKey] = useState(apiKeyProp || "");
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<{ [key: number]: boolean }>({});
   const FIXED_BACKEND_MODEL = "gemini-1.5-flash";
   const [sessions, setSessions] = useState<
     { id: string; title: string; updatedAt: number }[]
@@ -71,13 +76,17 @@ export default function PromptOptimizer({
     if (typeof window === "undefined") return;
     try {
       const saved = localStorage.getItem("gemini-api-key");
-      if (!saved) return;
-      const decrypted = CryptoJS.AES.decrypt(saved, SECRET_KEY).toString(
-        CryptoJS.enc.Utf8
-      );
-      if (decrypted) setApiKey(decrypted);
+      if (saved) {
+        const decrypted = CryptoJS.AES.decrypt(saved, SECRET_KEY).toString(
+          CryptoJS.enc.Utf8
+        );
+        if (decrypted) setApiKey(decrypted);
+      }
+
+      const model = getSelectedModel();
+      setSelectedModel(model);
     } catch (e) {
-      console.error("Failed to load API key from storage", e);
+      console.error("Failed to load settings from storage", e);
     }
   }, []);
 
@@ -120,7 +129,6 @@ export default function PromptOptimizer({
   const latestOptimizedPrompt =
     messages.filter((m) => m.role === "assistant").slice(-1)[0]?.content || "";
 
-  // Debounced session saving
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!sessionId || loadingSession || messages.length === 0) return;
@@ -163,11 +171,18 @@ export default function PromptOptimizer({
   }, [sessionId, messages, loadingSession, sessions]);
 
   const handleOptimize = async (isRefinement = false, instruction?: string) => {
-    if (!isApiKeyValid) return toast.error("Please enter a valid API key");
-    if (!isRefinement && !input.trim())
-      return toast.error("Please enter a prompt to optimize");
-    if (isRefinement && !(instruction || "").trim())
-      return toast.error("Please enter refinement instructions");
+    if (!isApiKeyValid) {
+      toast.error("Please configure your API key in Settings");
+      return;
+    }
+    if (!isRefinement && !input.trim()) {
+      toast.error("Please enter a prompt to optimize");
+      return;
+    }
+    if (isRefinement && !(instruction || "").trim()) {
+      toast.error("Please enter refinement instructions");
+      return;
+    }
 
     setIsLoading(true);
     const userMessageContent = isRefinement ? instruction || "" : input.trim();
@@ -181,7 +196,7 @@ export default function PromptOptimizer({
     try {
       const payload: any = {
         prompt: isRefinement ? latestOptimizedPrompt : input,
-        model: FIXED_BACKEND_MODEL,
+        model: selectedModel || FIXED_BACKEND_MODEL,
         apiKey,
       };
       if (isRefinement) {
@@ -225,22 +240,18 @@ export default function PromptOptimizer({
     handleOptimize(hasAssistantReply, input);
   };
 
-  const copyToClipboard = (text: string) => {
+  const copyToClipboard = (text: string, messageIndex: number) => {
     if (typeof navigator !== "undefined" && navigator.clipboard) {
       navigator.clipboard.writeText(text);
-      setCopied(true);
-      toast.success("Copied to clipboard!");
-      setTimeout(() => setCopied(false), 2000);
+      setCopied((prev) => ({ ...prev, [messageIndex]: true }));
+      toast.success("Copied to clipboard");
+      setTimeout(() => {
+        setCopied((prev) => ({ ...prev, [messageIndex]: false }));
+      }, 2000);
     }
   };
 
   const startNewOptimization = () => {
-    const hasContent = messages.length > 0;
-    if (!hasContent && sessionId) {
-      toast("Compose your first message to start this chat");
-      textareaRef.current?.focus();
-      return;
-    }
     router.push("/optimize");
   };
 
@@ -256,6 +267,7 @@ export default function PromptOptimizer({
     if (id === sessionId) {
       router.push("/");
     }
+    setConfirmDeleteId(null);
   };
 
   const saveRename = (id: string) => {
@@ -279,7 +291,7 @@ export default function PromptOptimizer({
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
       const scrollHeight = textareaRef.current.scrollHeight;
-      const maxHeight = 200;
+      const maxHeight = 160;
       textareaRef.current.style.height = `${Math.min(
         scrollHeight,
         maxHeight
@@ -294,194 +306,288 @@ export default function PromptOptimizer({
     }
   };
 
+  const formatRelativeTime = (timestamp: number) => {
+    const diff = Date.now() - timestamp;
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (minutes < 1) return "Just now";
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    if (days < 30) return `${days}d ago`;
+    return new Date(timestamp).toLocaleDateString();
+  };
+
   // --- Render Components ---
 
   const HistoryPanel = () => (
-    <aside className="flex flex-col h-full w-full max-w-sm p-4 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-lg border-r border-slate-200 dark:border-zinc-800">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold">History</h2>
-        <button
-          onClick={startNewOptimization}
-          className="flex items-center gap-2 text-sm px-3 py-1.5 rounded-lg bg-indigo-600 text-white shadow-sm hover:bg-indigo-500 disabled:opacity-50 transition-colors"
-          aria-label="New Optimization"
-        >
-          <FiPlus /> New
-        </button>
-      </div>
-      {sessions.length === 0 ? (
-        <div className="text-center text-sm text-gray-400 mt-8">
-          No past chats yet.
+    <aside className="flex flex-col h-full w-full max-w-sm bg-white dark:bg-gray-900 border-r border-slate-200 dark:border-gray-800 shadow-lg">
+      <div className="p-4 border-b border-slate-200 dark:border-gray-800 bg-gradient-to-r from-blue-50 to-white dark:from-gray-900 dark:to-gray-800">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-semibold text-slate-900 dark:text-gray-100 text-lg">
+            History
+          </h2>
+          <button
+            onClick={startNewOptimization}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 transform hover:scale-105"
+            aria-label="New Chat"
+          >
+            <FiPlus className="w-3 h-3" />
+            New
+          </button>
         </div>
-      ) : (
-        <ul className="space-y-2 overflow-y-auto flex-1">
-          {sessions.map((s) => (
-            <li key={s.id} className="group relative">
-              <Link
-                href={`/optimize/${s.id}`}
-                className={`block w-full text-left p-3 rounded-lg transition-colors ${
-                  s.id === sessionId
-                    ? "bg-blue-500/10 text-blue-600 dark:text-blue-300"
-                    : "hover:bg-slate-100 dark:hover:bg-zinc-800"
-                }`}
-              >
+        <div className="flex gap-2">
+          <Link
+            href="/"
+            className="flex items-center gap-1.5 px-2 py-1 text-xs text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-gray-200 transition-colors duration-200"
+          >
+            <FiHome className="w-3 h-3" />
+            Home
+          </Link>
+          <Link
+            href="/settings"
+            className="flex items-center gap-1.5 px-2 py-1 text-xs text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-gray-200 transition-colors duration-200"
+          >
+            <FiSettings className="w-3 h-3" />
+            Settings
+          </Link>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4">
+        {sessions.length === 0 ? (
+          <div className="text-center text-sm text-slate-500 dark:text-gray-500 mt-8 animate-fade-in">
+            <FiMessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
+            <p>No conversations yet</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {sessions.map((s) => (
+              <div key={s.id} className="group relative">
                 {editingId === s.id ? (
-                  <input
-                    value={editingTitle}
-                    onChange={(e) => setEditingTitle(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        saveRename(s.id);
-                      }
-                      if (e.key === "Escape") {
-                        setEditingId(null);
-                      }
-                    }}
-                    onBlur={() => saveRename(s.id)}
-                    autoFocus
-                    className="w-full bg-transparent border-b border-blue-400 focus:outline-none"
-                  />
-                ) : (
-                  <>
-                    <p className="font-medium truncate text-sm">
-                      {s.title || "Untitled"}
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      {new Date(s.updatedAt).toLocaleString()}
-                    </p>
-                  </>
-                )}
-              </Link>
-              {editingId !== s.id && (
-                <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                  {confirmDeleteId === s.id ? (
-                    <>
+                  <div className="p-3 border border-blue-300 rounded-lg bg-blue-50 dark:bg-blue-950/20">
+                    <input
+                      value={editingTitle}
+                      onChange={(e) => setEditingTitle(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") saveRename(s.id);
+                        if (e.key === "Escape") {
+                          setEditingId(null);
+                          setEditingTitle("");
+                        }
+                      }}
+                      className="w-full text-sm bg-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      autoFocus
+                    />
+                    <div className="flex gap-2 mt-2">
                       <button
-                        onClick={() => deleteSession(s.id)}
-                        className="p-2 rounded-md bg-red-500 text-white hover:bg-red-600 text-xs"
+                        onClick={() => saveRename(s.id)}
+                        className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-all duration-200"
                       >
-                        Confirm
+                        Save
                       </button>
                       <button
-                        onClick={() => setConfirmDeleteId(null)}
-                        className="p-2 rounded-md bg-slate-200 dark:bg-zinc-700 hover:bg-slate-300 dark:hover:bg-zinc-600 text-xs"
+                        onClick={() => {
+                          setEditingId(null);
+                          setEditingTitle("");
+                        }}
+                        className="px-2 py-1 text-xs bg-slate-200 dark:bg-gray-700 rounded hover:bg-slate-300 dark:hover:bg-gray-600 transition-all duration-200"
                       >
                         Cancel
                       </button>
-                    </>
-                  ) : (
-                    <>
+                    </div>
+                  </div>
+                ) : confirmDeleteId === s.id ? (
+                  <div className="p-3 border border-red-300 rounded-lg bg-red-50 dark:bg-red-950/20">
+                    <p className="text-sm text-red-800 dark:text-red-200 mb-2">
+                      Delete this chat?
+                    </p>
+                    <div className="flex gap-2">
                       <button
-                        onClick={() => {
+                        onClick={() => deleteSession(s.id)}
+                        className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition-all duration-200"
+                      >
+                        Delete
+                      </button>
+                      <button
+                        onClick={() => setConfirmDeleteId(null)}
+                        className="px-2 py-1 text-xs bg-slate-200 dark:bg-gray-700 rounded hover:bg-slate-300 dark:hover:bg-gray-600 transition-all duration-200"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <Link
+                    href={`/optimize/${s.id}`}
+                    className={`block p-3 rounded-lg transition-all duration-200 transform hover:scale-102 ${
+                      s.id === sessionId
+                        ? "bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 shadow-md"
+                        : "hover:bg-slate-50 dark:hover:bg-gray-800"
+                    }`}
+                  >
+                    <p className="text-sm font-medium text-slate-900 dark:text-gray-100 truncate mb-1">
+                      {s.title || "Untitled Chat"}
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-gray-500">
+                      {formatRelativeTime(s.updatedAt)}
+                    </p>
+                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex gap-1">
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
                           setEditingId(s.id);
-                          setEditingTitle(s.title || "Untitled");
+                          setEditingTitle(s.title || "");
                         }}
-                        className="p-2 rounded-md hover:bg-slate-200 dark:hover:bg-zinc-700"
+                        className="p-1 rounded hover:bg-slate-200 dark:hover:bg-gray-700 transition-all duration-200"
                         title="Rename"
                       >
-                        <FiEdit2 className="w-4 h-4" />
+                        <FiEdit2 className="w-3 h-3" />
                       </button>
                       <button
-                        onClick={() => setConfirmDeleteId(s.id)}
-                        className="p-2 rounded-md text-red-500 hover:bg-red-500/10"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setConfirmDeleteId(s.id);
+                        }}
+                        className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 transition-all duration-200"
                         title="Delete"
                       >
-                        <FiTrash2 className="w-4 h-4" />
+                        <FiTrash2 className="w-3 h-3" />
                       </button>
-                    </>
-                  )}
-                </div>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
+                    </div>
+                  </Link>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </aside>
   );
 
   return (
-    <div className="min-h-screen flex bg-slate-50 text-slate-900 dark:bg-zinc-900 dark:text-white">
-      {/* Mobile History Drawer */}
+    <div className="min-h-screen flex bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+      {isHistoryOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/50 lg:hidden"
+          onClick={() => setIsHistoryOpen(false)}
+        />
+      )}
+
       <div
-        className={`fixed inset-0 z-30 bg-black/30 transition-opacity lg:hidden ${
-          isHistoryOpen ? "opacity-100" : "opacity-0 pointer-events-none"
-        }`}
-        onClick={() => setIsHistoryOpen(false)}
-      />
-      <div
-        className={`fixed top-0 left-0 h-full z-40 transition-transform lg:hidden ${
+        className={`fixed top-0 left-0 h-full z-40 transition-transform duration-300 lg:hidden ${
           isHistoryOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
+        <div className="w-80 h-full">
+          <HistoryPanel />
+        </div>
+      </div>
+
+      <div className="hidden lg:flex lg:w-80">
         <HistoryPanel />
       </div>
 
-      {/* Desktop History Panel */}
-      <div className="hidden lg:flex lg:w-80 xl:w-96">
-        <HistoryPanel />
-      </div>
-
-      {/* Main Content */}
       <main className="flex-1 flex flex-col h-screen">
-        <header className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-zinc-800">
-          <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-indigo-600">
-            Prompt Optimizer
-          </h1>
-          <button
-            className="lg:hidden p-2 rounded-md hover:bg-slate-100 dark:hover:bg-zinc-800"
-            onClick={() => setIsHistoryOpen(true)}
-            aria-label="Open history"
-          >
-            <FiMenu />
-          </button>
+        <header className="flex items-center justify-between p-4 bg-white dark:bg-gray-900 border-b border-slate-200 dark:border-gray-800 shadow-md">
+          <div className="flex items-center gap-3">
+            <button
+              className="lg:hidden p-2 -ml-2 rounded-lg hover:bg-slate-100 dark:hover:bg-gray-800 transition-all duration-200"
+              onClick={() => setIsHistoryOpen(true)}
+              aria-label="Open sidebar"
+            >
+              <FiMenu className="w-5 h-5" />
+            </button>
+            <h1 className="text-lg font-bold text-slate-900 dark:text-gray-100">
+              Prompt Optimizer
+            </h1>
+          </div>
+          {!isApiKeyValid && (
+            <Link
+              href="/settings"
+              className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-100 dark:bg-amber-900/30 rounded-lg hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-all duration-200"
+            >
+              <FiSettings className="w-3 h-3" />
+              Setup Required
+            </Link>
+          )}
         </header>
 
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto bg-gradient-to-b from-white/80 to-indigo-50 dark:from-gray-900/80 dark:to-gray-950">
           {loadingSession ? (
-            <div className="flex justify-center items-center h-full text-gray-400">
-              Loading...
+            <div className="flex justify-center items-center h-full text-slate-500 dark:text-gray-500">
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                Loading chat...
+              </div>
             </div>
           ) : messages.length === 0 ? (
-            <div className="text-center text-gray-400 h-full flex flex-col justify-center items-center">
-              <FiMessageSquare className="w-12 h-12 text-gray-500 mb-4" />
-              <h2 className="text-lg font-medium">Start a new optimization</h2>
-              <p>Enter your initial prompt below to begin.</p>
+            <div className="flex flex-col items-center justify-center h-full text-center px-6 animate-fade-in">
+              <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-indigo-200 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
+                <FiMessageSquare className="w-8 h-8 text-blue-600 dark:text-indigo-400" />
+              </div>
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-gray-100 mb-2">
+                Ready to optimize
+              </h2>
+              <p className="text-slate-600 dark:text-gray-400 max-w-md">
+                Enter a prompt below and let AI transform it into a
+                high-performance instruction
+              </p>
             </div>
           ) : (
-            <>
+            <div className="p-4 space-y-6">
               {messages.map((m, i) => (
                 <div
                   key={`${m.role}-${i}`}
-                  className={`flex items-start gap-3 ${
+                  className={`flex gap-3 px-4 py-2 animate-slide-in ${
                     m.role === "user" ? "justify-end" : "justify-start"
                   }`}
                 >
                   {m.role === "assistant" && (
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center bg-gradient-to-br from-cyan-400 to-indigo-500 text-white shrink-0">
-                      <FiCpu className="w-5 h-5" />
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-md">
+                      <FiCpu className="w-4 h-4 text-white" />
                     </div>
                   )}
                   <div
-                    className={`max-w-[85%] rounded-xl px-4 py-3 text-sm ${
+                    className={`max-w-[80%] rounded-2xl px-4 py-3 shadow-lg transition-all duration-300 hover:shadow-xl ${
                       m.role === "user"
-                        ? "bg-blue-600 text-white"
-                        : "bg-white border border-slate-200 text-slate-800 dark:bg-zinc-800 dark:border-zinc-700 dark:text-gray-100"
+                        ? "bg-gradient-to-br from-blue-600 to-indigo-700 text-white"
+                        : "bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700"
                     }`}
                   >
-                    <pre className="whitespace-pre-wrap break-words font-sans">
+                    <div className="whitespace-pre-wrap break-words text-sm leading-relaxed">
                       {m.content}
-                    </pre>
+                    </div>
+                    {m.role === "assistant" && (
+                      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-200 dark:border-gray-700">
+                        <button
+                          onClick={() => copyToClipboard(m.content, i)}
+                          className="flex items-center gap-1.5 px-2 py-1 text-xs text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-gray-200 hover:bg-slate-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-200"
+                        >
+                          {copied[i] ? (
+                            <FiCheckCircle className="w-3 h-3" />
+                          ) : (
+                            <FiCopy className="w-3 h-3" />
+                          )}
+                          {copied[i] ? "Copied" : "Copy"}
+                        </button>
+                      </div>
+                    )}
                     {m.explanations && m.explanations.length > 0 && (
-                      <div className="mt-4 pt-3 border-t border-slate-200/50 dark:border-zinc-700/50">
-                        <h3 className="text-xs font-semibold mb-2 text-slate-600 dark:text-zinc-400">
-                          IMPROVEMENTS
-                        </h3>
-                        <ul className="space-y-2">
+                      <div className="mt-4 pt-3 border-t border-slate-200 dark:border-gray-700">
+                        <h4 className="text-xs font-semibold text-slate-600 dark:text-gray-400 mb-2">
+                          IMPROVEMENTS MADE:
+                        </h4>
+                        <ul className="space-y-1.5">
                           {m.explanations.map((ex, idx) => (
                             <li
                               key={idx}
-                              className="flex items-start gap-2 text-slate-700 dark:text-gray-200"
+                              className="flex items-start gap-2 text-xs text-slate-700 dark:text-gray-300"
                             >
-                              <FiCheckCircle className="shrink-0 text-green-400 mt-0.5" />
+                              <FiCheckCircle className="w-3 h-3 text-green-500 mt-0.5 flex-shrink-0" />
                               <span>{ex}</span>
                             </li>
                           ))}
@@ -490,68 +596,92 @@ export default function PromptOptimizer({
                     )}
                   </div>
                   {m.role === "user" && (
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center bg-blue-600 text-white shrink-0">
-                      <FiUser className="w-5 h-5" />
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center flex-shrink-0 shadow-md">
+                      <FiUser className="w-4 h-4 text-white" />
                     </div>
                   )}
                 </div>
               ))}
               {isLoading && (
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center bg-gradient-to-br from-cyan-400 to-indigo-500 text-white shrink-0">
-                    <FiCpu className="w-5 h-5" />
+                <div className="flex gap-3">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+                    <FiCpu className="w-4 h-4 text-white" />
                   </div>
-                  <div className="px-4 py-3 rounded-xl text-sm bg-white border border-slate-200 text-slate-800 dark:bg-zinc-800 dark:border-zinc-700 dark:text-gray-100">
-                    Optimizing...
+                  <div className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-2xl px-4 py-3">
+                    <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-gray-400">
+                      <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                      Optimizing your prompt...
+                    </div>
                   </div>
                 </div>
               )}
               <div ref={chatEndRef} />
-            </>
+            </div>
           )}
         </div>
 
         {latestOptimizedPrompt && (
-          <div className="p-4 flex gap-2 border-t border-slate-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-lg">
-            <button
-              onClick={() => copyToClipboard(latestOptimizedPrompt)}
-              className="flex-1 flex items-center justify-center gap-2 rounded-lg px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 transition-colors text-sm"
-            >
-              {copied ? <FiCheckCircle /> : <FiCopy />}
-              {copied ? "Copied" : "Copy Optimized Prompt"}
-            </button>
-            <button
-              onClick={() => handleOptimize(true, input)}
-              disabled={isLoading}
-              className="flex-1 flex items-center justify-center gap-2 rounded-lg px-3 py-2 bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50 transition-colors text-sm"
-            >
-              <FiRefreshCw /> Refine Again
-            </button>
+          <div className="p-4 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-t border-slate-200/50 dark:border-gray-800/50 shadow-md">
+            <div className="flex gap-2">
+              <button
+                onClick={() => copyToClipboard(latestOptimizedPrompt, -1)}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 dark:text-gray-300 bg-slate-100 dark:bg-gray-800 rounded-lg hover:bg-slate-200 dark:hover:bg-gray-700 transition-all duration-200 transform hover:scale-105"
+              >
+                {copied[-1] ? (
+                  <FiCheckCircle className="w-4 h-4" />
+                ) : (
+                  <FiCopy className="w-4 h-4" />
+                )}
+                Copy Latest
+              </button>
+              <button
+                onClick={startNewOptimization}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-700 rounded-lg hover:from-blue-700 hover:to-indigo-800 transition-all duration-200 transform hover:scale-105"
+              >
+                <FiRefreshCw className="w-4 h-4" />
+                New Chat
+              </button>
+            </div>
           </div>
         )}
 
         <form
           onSubmit={handleSend}
-          className="p-4 border-t border-slate-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-lg"
+          className="p-4 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-t border-slate-200/50 dark:border-gray-800/50 shadow-md"
         >
-          <div className="flex items-end gap-2">
+          <div className="flex gap-3">
             <textarea
               ref={textareaRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Enter a prompt to optimize..."
-              className="flex-1 resize-none rounded-lg border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder={
+                messages.length === 0
+                  ? "Enter a prompt to optimize..."
+                  : "Ask for refinements or enter a new prompt..."
+              }
+              className="flex-1 resize-none rounded-xl border border-slate-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-3 text-sm 
+                       focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent
+                       placeholder:text-slate-500 dark:placeholder:text-gray-500 transition-all duration-200"
               rows={1}
+              disabled={!isApiKeyValid}
             />
             <button
               type="submit"
-              disabled={isLoading || !input.trim()}
-              className="shrink-0 px-4 py-3 rounded-lg bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50 transition-colors flex items-center gap-2"
+              disabled={isLoading || !input.trim() || !isApiKeyValid}
+              className="px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-xl hover:from-blue-700 hover:to-indigo-800 
+                       disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-105
+                       flex items-center gap-2 font-medium"
             >
-              <FiSend /> Send
+              <FiSend className="w-4 h-4" />
+              <span className="hidden sm:inline">Send</span>
             </button>
           </div>
+          {!isApiKeyValid && (
+            <div className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+              API key required. Visit Settings to configure.
+            </div>
+          )}
         </form>
       </main>
     </div>

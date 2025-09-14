@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
+// Define supported models inline to avoid import issues
+const SUPPORTED_MODELS = [
+  "gemini-1.5-flash",
+  "gemini-2.0-flash",
+  "gemini-2.5-flash",
+] as const;
 
 async function generateWithRetry(
   genAI: any,
@@ -20,7 +26,9 @@ async function generateWithRetry(
       const retriable = [429, 500, 503];
       if (retriable.includes(err?.status) && attempt < retries) {
         console.warn(
-          `GenAI transient error (status=${err.status}). Retrying attempt ${attempt}/${retries} after ${
+          `GenAI transient error (status=${
+            err.status
+          }). Retrying attempt ${attempt}/${retries} after ${
             delay * attempt
           }ms.`
         );
@@ -50,10 +58,21 @@ export async function POST(req: NextRequest) {
 
     const genAI = new GoogleGenAI({ apiKey });
 
-    const resolvedModel =
-      typeof model === "string" && model.trim()
-        ? model.trim()
-        : "gemini-2.0-flash";
+    // Use the provided model or fall back to gemini-2.0-flash if not provided
+    const resolvedModel = model?.trim() || "gemini-2.0-flash";
+
+    // Validate the model against supported models
+    if (!SUPPORTED_MODELS.includes(resolvedModel as any)) {
+      return NextResponse.json(
+        {
+          error: `Unsupported model. Please use one of: ${SUPPORTED_MODELS.join(
+            ", "
+          )}`,
+        },
+        { status: 400 }
+      );
+    }
+
     const supportsSchema = /1\.5|2\./.test(resolvedModel);
 
     const fullPrompt =
@@ -100,7 +119,12 @@ export async function POST(req: NextRequest) {
     }
 
     // --- call model with retry ---
-    const result = await generateWithRetry(genAI, resolvedModel, contents, config);
+    const result = await generateWithRetry(
+      genAI,
+      resolvedModel,
+      contents,
+      config
+    );
 
     const text = result.text;
 
