@@ -18,6 +18,30 @@ interface ApiRequestBody {
   refinementInstruction?: string;
 }
 
+/**
+ * Maps low-level provider errors to user-friendly messages.
+ */
+function getFriendlyErrorMessage(status: number, raw: string): string {
+  const msg = raw?.toLowerCase() || "";
+  if (status === 503 || msg.includes("overload") || msg.includes("service unavailable")) {
+    return "The model is currently busy. Please try again in a moment.";
+  }
+  if (status === 429 || msg.includes("rate") || msg.includes("quota")) {
+    return "You're sending requests too quickly or have hit a quota limit. Please wait and try again.";
+  }
+  if (status === 400) {
+    // Preserve specific client errors (e.g., validation) but make them friendly if generic
+    if (/missing required fields/i.test(raw)) {
+      return "Please provide a prompt and API key to continue.";
+    }
+    if (/unsupported model/i.test(raw)) {
+      return "This model isn't supported. Please choose another model in Settings.";
+    }
+    return raw || "Your request couldn't be processed. Please check your input and try again.";
+  }
+  return "The service is temporarily unavailable. Please try again later.";
+}
+
 interface ApiResponseError {
   error: string;
 }
@@ -255,9 +279,7 @@ export async function POST(
         ? error
         : new ApiError("An unexpected error occurred.", 500);
 
-    return NextResponse.json(
-      { error: apiError.message },
-      { status: apiError.status }
-    );
+    const friendly = getFriendlyErrorMessage(apiError.status, apiError.message);
+    return NextResponse.json({ error: friendly }, { status: apiError.status });
   }
 }

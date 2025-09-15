@@ -20,9 +20,7 @@ export const decryptSafe = (
     return { ok: false, reason: 'No encrypted data provided' };
   }
 
-  if (!secret) {
-    return { ok: false, reason: 'No secret key provided' };
-  }
+  // Allow empty string secrets to support deployments without NEXT_PUBLIC_SECRET_KEY.
 
   try {
     const options: {

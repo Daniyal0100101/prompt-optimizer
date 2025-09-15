@@ -26,7 +26,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { getSelectedModel, ModelId } from "../utils/modelConfig";
 import { SECRET_KEY } from "../utils/config";
-import { decryptSafe } from "../utils/cryptoUtils";
+import { decryptSafe, getIV } from "../utils/cryptoUtils";
 import EmptyState from "./ui/EmptyState";
 import SessionCard from "./ui/SessionCard";
 
@@ -110,10 +110,11 @@ export default function PromptOptimizer({
     try {
       const savedKey = localStorage.getItem("API_KEY");
       if (savedKey) {
+        const iv = getIV(SECRET_KEY);
         const result = decryptSafe(
           savedKey,
           SECRET_KEY,
-          undefined,
+          iv,
           CryptoJS.mode.CBC,
           CryptoJS.pad.Pkcs7
         );

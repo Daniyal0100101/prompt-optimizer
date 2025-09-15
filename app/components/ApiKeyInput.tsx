@@ -63,7 +63,9 @@ export default function ApiKeyInput({
             CryptoJS.pad.Pkcs7
           );
           
-          if (result.ok && result.plaintext && validateApiKey(result.plaintext)) {
+          // If decryption succeeds and there's a plaintext, trust the stored key without re-validating.
+          // Validation is enforced when the user first saves the key.
+          if (result.ok && result.plaintext) {
             setApiKey(result.plaintext);
             setIsValid(true);
             setIsSaved(true);
@@ -89,7 +91,7 @@ export default function ApiKeyInput({
               CryptoJS.pad.Pkcs7
             );
             
-            if (result.ok && result.plaintext && validateApiKey(result.plaintext)) {
+            if (result.ok && result.plaintext) {
               // Re-encrypt with the new key for next time
               const newIv = getIV(SECRET_KEY);
               const encrypted = CryptoJS.AES.encrypt(
@@ -136,7 +138,9 @@ export default function ApiKeyInput({
   }, [onModelChange, onKeyVerified]);
 
   const validateApiKey = (key: string): boolean => {
-    const pattern = /^AIza[0-9A-Za-z\-_]{35}$/;
+    // Relaxed validation to accommodate potential key format changes by Google.
+    // Accepts keys starting with AIza and with a reasonable length.
+    const pattern = /^AIza[0-9A-Za-z\-_]{20,100}$/;
     return pattern.test(key);
   };
 

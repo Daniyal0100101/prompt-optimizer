@@ -65,7 +65,7 @@ export default function Home() {
     try {
       const savedKey = localStorage.getItem("API_KEY");
       if (savedKey) {
-        const iv = SECRET_KEY ? getIV(SECRET_KEY) : undefined;
+        const iv = getIV(SECRET_KEY);
         const result = decryptSafe(
           savedKey,
           SECRET_KEY,
@@ -152,7 +152,7 @@ export default function Home() {
         throw new Error("API key not found in localStorage.");
       }
 
-      const iv = SECRET_KEY ? getIV(SECRET_KEY) : undefined;
+      const iv = getIV(SECRET_KEY);
       const result = decryptSafe(
         savedKey,
         SECRET_KEY,
