@@ -2,13 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState, useRef, useCallback, FormEvent } from "react";
-import {
-  FiSettings,
-  FiClock,
-  FiGrid,
-  FiList,
-  FiPlus,
-} from "react-icons/fi";
+import { FiSettings, FiClock, FiGrid, FiList, FiPlus } from "react-icons/fi";
 import { HiOutlineSparkles } from "react-icons/hi2";
 import { useRouter } from "next/navigation";
 import * as CryptoJS from "crypto-js";
@@ -162,8 +156,10 @@ export default function Home() {
       );
 
       if (!result.ok || !result.plaintext) {
-        console.error('Failed to decrypt API key:', result);
-        toast.error("Invalid or corrupted API key. Please re-enter in settings.");
+        console.error("Failed to decrypt API key:", result);
+        toast.error(
+          "Invalid or corrupted API key. Please re-enter in settings."
+        );
         router.push("/settings");
         return;
       }
@@ -196,12 +192,17 @@ export default function Home() {
 
       localStorage.setItem(`chat:${id}`, JSON.stringify({ messages }));
 
-      const newSession: Session = { id, title: text.slice(0, 80), updatedAt: Date.now() };
+      const newSession: Session = {
+        id,
+        title: text.slice(0, 80),
+        updatedAt: Date.now(),
+      };
       persistSessions([newSession, ...sessions]);
 
       router.push(`/optimize/${id}`);
     } catch (error: unknown) {
-      const errorMessage = (error as Error).message || "An unknown error occurred.";
+      const errorMessage =
+        (error as Error).message || "An unknown error occurred.";
       console.error("Start from home failed", errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -248,8 +249,8 @@ export default function Home() {
             </h1>
 
             <p className="text-base md:text-lg text-slate-600 dark:text-gray-400 max-w-2xl mx-auto leading-relaxed">
-              Transform your ideas into high-performance instructions with AI-driven
-              optimization. Get better results with smarter prompts.
+              Transform your ideas into high-performance instructions with
+              AI-driven optimization. Get better results with smarter prompts.
             </p>
           </div>
         </header>
@@ -264,7 +265,7 @@ export default function Home() {
               API Key Required
             </div>
           )}
-          
+
           <TextareaInput
             ref={textareaRef}
             value={homeInput}
@@ -291,10 +292,7 @@ export default function Home() {
                   Click any suggestion to get started quickly
                 </p>
               </div>
-              <QuickPrompts
-                prompts={quickPrompts}
-                onSelect={setHomeInput}
-              />
+              <QuickPrompts prompts={quickPrompts} onSelect={setHomeInput} />
             </div>
           )}
 
@@ -360,8 +358,14 @@ export default function Home() {
             {filteredSessions.length === 0 ? (
               <EmptyState
                 icon={<FiClock className="w-8 h-8 text-white" />}
-                title={searchFilter ? "No matching sessions" : "No optimizations yet"}
-                description={searchFilter ? "Try adjusting your search terms." : "Start by entering a prompt above to create your first optimization."}
+                title={
+                  searchFilter ? "No matching sessions" : "No optimizations yet"
+                }
+                description={
+                  searchFilter
+                    ? "Try adjusting your search terms."
+                    : "Start by entering a prompt above to create your first optimization."
+                }
               />
             ) : (
               <div
@@ -383,7 +387,9 @@ export default function Home() {
                       persistSessions(updatedSessions);
                     }}
                     onDelete={(id) => {
-                      const updatedSessions = sessions.filter((s) => s.id !== id);
+                      const updatedSessions = sessions.filter(
+                        (s) => s.id !== id
+                      );
                       persistSessions(updatedSessions);
                       try {
                         localStorage.removeItem(`chat:${id}`);

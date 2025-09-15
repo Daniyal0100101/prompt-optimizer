@@ -3,7 +3,7 @@
 import PromptOptimizer from "../../components/PromptOptimizer";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import * as CryptoJS from 'crypto-js';
+import * as CryptoJS from "crypto-js";
 import { decryptSafe, getIV } from "../../utils/cryptoUtils";
 import { SECRET_KEY } from "../../utils/config";
 
@@ -14,18 +14,18 @@ export default function OptimizeSessionPage() {
   // Guard: require API key
   useEffect(() => {
     setIsClient(true);
-    
+
     try {
       // Only run on client side
-      if (typeof window === 'undefined') return;
-      
-      const saved = localStorage.getItem('API_KEY');
+      if (typeof window === "undefined") return;
+
+      const saved = localStorage.getItem("API_KEY");
       if (!saved) {
-        console.warn('No API key found in localStorage');
-        router.replace('/settings');
+        console.warn("No API key found in localStorage");
+        router.replace("/settings");
         return;
       }
-      
+
       try {
         const iv = SECRET_KEY ? getIV(SECRET_KEY) : undefined;
         const result = decryptSafe(
@@ -35,22 +35,22 @@ export default function OptimizeSessionPage() {
           CryptoJS.mode.CBC,
           CryptoJS.pad.Pkcs7
         );
-        
+
         if (!result.ok || !result.plaintext) {
-          console.warn('Failed to decrypt API key');
+          console.warn("Failed to decrypt API key");
           if (!result.ok) {
             const errorResult = result as { reason?: string };
-            console.warn('Reason:', errorResult.reason || 'Unknown error');
+            console.warn("Reason:", errorResult.reason || "Unknown error");
           }
-          router.replace('/settings');
+          router.replace("/settings");
         }
       } catch (error) {
-        console.error('Error decrypting API key:', error);
-        router.replace('/settings');
+        console.error("Error decrypting API key:", error);
+        router.replace("/settings");
       }
     } catch (error) {
-      console.error('Error checking API key:', error);
-      router.replace('/settings');
+      console.error("Error checking API key:", error);
+      router.replace("/settings");
     }
   }, [router]);
 

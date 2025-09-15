@@ -1,10 +1,5 @@
 import { useState, useEffect, ChangeEvent } from "react";
-import {
-  FiKey,
-  FiCheck,
-  FiAlertCircle,
-  FiChevronDown,
-} from "react-icons/fi";
+import { FiKey, FiCheck, FiAlertCircle, FiChevronDown } from "react-icons/fi";
 import toast from "react-hot-toast";
 import * as CryptoJS from "crypto-js";
 import {
@@ -46,8 +41,8 @@ export default function ApiKeyInput({
   useEffect(() => {
     const loadSavedKey = () => {
       // Only run on client side
-      if (typeof window === 'undefined') return;
-      
+      if (typeof window === "undefined") return;
+
       const savedKey = localStorage.getItem("API_KEY");
       if (!savedKey) return;
 
@@ -62,7 +57,7 @@ export default function ApiKeyInput({
             CryptoJS.mode.CBC,
             CryptoJS.pad.Pkcs7
           );
-          
+
           // If decryption succeeds and there's a plaintext, trust the stored key without re-validating.
           // Validation is enforced when the user first saves the key.
           if (result.ok && result.plaintext) {
@@ -72,14 +67,16 @@ export default function ApiKeyInput({
             onKeyVerified(true);
             return;
           } else if (!result.ok) {
-            console.warn('Decryption failed:', result.reason);
+            console.warn("Decryption failed:", result.reason);
           }
         } catch {
-          console.warn("Failed to decrypt with current key, trying fallback...");
+          console.warn(
+            "Failed to decrypt with current key, trying fallback..."
+          );
         }
-        
+
         // If we get here, decryption failed - try with the hardcoded fallback key
-        const FALLBACK_KEY = 'uJioow3SoPYeAG3iEBRGlSAdFMi8C10AfZVrw3X_4dg=';
+        const FALLBACK_KEY = "uJioow3SoPYeAG3iEBRGlSAdFMi8C10AfZVrw3X_4dg=";
         if (SECRET_KEY !== FALLBACK_KEY) {
           try {
             const iv = getIV(FALLBACK_KEY);
@@ -90,39 +87,38 @@ export default function ApiKeyInput({
               CryptoJS.mode.CBC,
               CryptoJS.pad.Pkcs7
             );
-            
+
             if (result.ok && result.plaintext) {
               // Re-encrypt with the new key for next time
               const newIv = getIV(SECRET_KEY);
               const encrypted = CryptoJS.AES.encrypt(
                 result.plaintext,
                 SECRET_KEY,
-                { 
+                {
                   iv: CryptoJS.enc.Utf8.parse(newIv),
-                  mode: CryptoJS.mode.CBC, 
-                  padding: CryptoJS.pad.Pkcs7 
+                  mode: CryptoJS.mode.CBC,
+                  padding: CryptoJS.pad.Pkcs7,
                 }
               );
               localStorage.setItem("API_KEY", encrypted.toString());
-              
+
               setApiKey(result.plaintext);
               setIsValid(true);
               setIsSaved(true);
               onKeyVerified(true);
               return;
             } else if (!result.ok) {
-              console.warn('Fallback decryption failed:', result.reason);
+              console.warn("Fallback decryption failed:", result.reason);
             }
           } catch {
             console.warn("Failed to decrypt with fallback key");
           }
         }
-        
+
         // If we get here, decryption failed with both keys
         console.error("Failed to decrypt API key with any available key");
         toast.error("Failed to load saved API key. Please enter it again.");
         localStorage.removeItem("API_KEY");
-        
       } catch (error) {
         console.error("Error loading saved API key:", error);
         toast.error("Error loading saved API key. Please enter it again.");
@@ -131,7 +127,7 @@ export default function ApiKeyInput({
     };
 
     loadSavedKey();
-    
+
     const savedModel = getSelectedModel();
     setSelectedModel(savedModel);
     if (onModelChange) onModelChange(savedModel);
@@ -163,16 +159,12 @@ export default function ApiKeyInput({
 
     try {
       const iv = getIV(SECRET_KEY);
-      const encrypted = CryptoJS.AES.encrypt(
-        apiKey,
-        SECRET_KEY,
-        { 
-          iv: CryptoJS.enc.Utf8.parse(iv),
-          mode: CryptoJS.mode.CBC, 
-          padding: CryptoJS.pad.Pkcs7 
-        }
-      );
-      
+      const encrypted = CryptoJS.AES.encrypt(apiKey, SECRET_KEY, {
+        iv: CryptoJS.enc.Utf8.parse(iv),
+        mode: CryptoJS.mode.CBC,
+        padding: CryptoJS.pad.Pkcs7,
+      });
+
       localStorage.setItem("API_KEY", encrypted.toString());
       setIsValid(true);
       setIsSaved(true);

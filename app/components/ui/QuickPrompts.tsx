@@ -6,7 +6,11 @@ interface QuickPromptsProps {
   className?: string;
 }
 
-const QuickPrompts = ({ prompts, onSelect, className = "" }: QuickPromptsProps) => {
+const QuickPrompts = ({
+  prompts,
+  onSelect,
+  className = "",
+}: QuickPromptsProps) => {
   return (
     <div className={`flex flex-wrap gap-3 justify-center ${className}`}>
       {prompts.map((prompt, index) => (

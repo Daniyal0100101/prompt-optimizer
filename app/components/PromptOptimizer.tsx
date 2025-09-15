@@ -31,7 +31,9 @@ import EmptyState from "./ui/EmptyState";
 import SessionCard from "./ui/SessionCard";
 
 if (!process.env.NEXT_PUBLIC_SECRET_KEY) {
-  console.warn("NEXT_PUBLIC_SECRET_KEY is not defined in environment variables");
+  console.warn(
+    "NEXT_PUBLIC_SECRET_KEY is not defined in environment variables"
+  );
 }
 
 // --- Type Definitions ---
@@ -82,14 +84,15 @@ export default function PromptOptimizer({
   // --- State Management ---
   const [isLoading, setIsLoading] = useState(false);
   const [isApiKeyValid, setIsApiKeyValid] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<ModelId>("gemini-1.5-flash");
+  const [selectedModel, setSelectedModel] =
+    useState<ModelId>("gemini-1.5-flash");
   const [apiKey, setApiKey] = useState(apiKeyProp || "");
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [copied, setCopied] = useState<{ [key: string]: boolean }>({});
   const [sessions, setSessions] = useState<Session[]>([]);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-    const [loadingSession, setLoadingSession] = useState(true);
+  const [loadingSession, setLoadingSession] = useState(true);
   // Removed inline rename/delete state in favor of reusable SessionCard component
 
   // --- Refs ---
@@ -100,7 +103,8 @@ export default function PromptOptimizer({
   // --- Memoized Values ---
   const latestOptimizedPrompt = useMemo(
     () =>
-      messages.filter((m) => m.role === "assistant").slice(-1)[0]?.content || "",
+      messages.filter((m) => m.role === "assistant").slice(-1)[0]?.content ||
+      "",
     [messages]
   );
 
@@ -118,20 +122,20 @@ export default function PromptOptimizer({
           CryptoJS.mode.CBC,
           CryptoJS.pad.Pkcs7
         );
-        
+
         if (result.ok && result.plaintext) {
           setApiKey(result.plaintext);
           setIsApiKeyValid(true);
         } else {
-          console.warn('Failed to decrypt API key');
+          console.warn("Failed to decrypt API key");
           if (!result.ok) {
             const errorResult = result as { reason?: string };
-            console.warn('Reason:', errorResult.reason || 'Unknown error');
+            console.warn("Reason:", errorResult.reason || "Unknown error");
           }
           setIsApiKeyValid(false);
         }
       } else {
-        console.warn('No API key found in localStorage');
+        console.warn("No API key found in localStorage");
         setIsApiKeyValid(false);
       }
       setSelectedModel(getSelectedModel());
@@ -195,8 +199,14 @@ export default function PromptOptimizer({
         const title = (firstUserMessage?.content || "New Chat").slice(0, 80);
 
         setSessions((prevSessions) => {
-          const existingIndex = prevSessions.findIndex((s) => s.id === sessionId);
-          const newEntry: Session = { id: sessionId, title, updatedAt: Date.now() };
+          const existingIndex = prevSessions.findIndex(
+            (s) => s.id === sessionId
+          );
+          const newEntry: Session = {
+            id: sessionId,
+            title,
+            updatedAt: Date.now(),
+          };
 
           let updatedSessions;
           if (existingIndex >= 0) {
@@ -206,7 +216,9 @@ export default function PromptOptimizer({
             updatedSessions = [newEntry, ...prevSessions];
           }
 
-          const sorted = updatedSessions.sort((a, b) => b.updatedAt - a.updatedAt);
+          const sorted = updatedSessions.sort(
+            (a, b) => b.updatedAt - a.updatedAt
+          );
           localStorage.setItem("chat_sessions", JSON.stringify(sorted));
           return sorted;
         });
@@ -274,7 +286,8 @@ export default function PromptOptimizer({
       setMessages([...currentMessages, newAssistantMessage]);
       toast.success(isRefinement ? "Prompt refined" : "Prompt optimized");
     } catch (error: unknown) {
-      const errorMessage = (error as Error).message || "An unknown error occurred.";
+      const errorMessage =
+        (error as Error).message || "An unknown error occurred.";
       console.error("Optimization error:", errorMessage);
       toast.error(errorMessage);
       // Revert to previous state on error
@@ -375,7 +388,14 @@ export default function PromptOptimizer({
         ) : (
           <div className="space-y-2">
             {sessions.map((s) => (
-              <div key={s.id} className={`${s.id === sessionId ? 'ring-2 ring-blue-200 dark:ring-blue-800' : ''}`}>
+              <div
+                key={s.id}
+                className={`${
+                  s.id === sessionId
+                    ? "ring-2 ring-blue-200 dark:ring-blue-800"
+                    : ""
+                }`}
+              >
                 <SessionCard
                   session={s}
                   viewMode="list"
@@ -386,16 +406,24 @@ export default function PromptOptimizer({
                     );
                     setSessions(updatedSessions);
                     try {
-                      localStorage.setItem("chat_sessions", JSON.stringify(updatedSessions));
+                      localStorage.setItem(
+                        "chat_sessions",
+                        JSON.stringify(updatedSessions)
+                      );
                     } catch (e) {
                       console.warn("Error renaming session:", e);
                     }
                   }}
                   onDelete={(id) => {
-                    const updatedSessions = sessions.filter((session) => session.id !== id);
+                    const updatedSessions = sessions.filter(
+                      (session) => session.id !== id
+                    );
                     setSessions(updatedSessions);
                     try {
-                      localStorage.setItem("chat_sessions", JSON.stringify(updatedSessions));
+                      localStorage.setItem(
+                        "chat_sessions",
+                        JSON.stringify(updatedSessions)
+                      );
                       localStorage.removeItem(`chat:${id}`);
                     } catch (e) {
                       console.warn("Error deleting session:", e);
@@ -507,9 +535,7 @@ export default function PromptOptimizer({
                     {m.role === "assistant" && (
                       <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-200 dark:border-gray-700">
                         <button
-                          onClick={() =>
-                            copyToClipboard(m.content, `msg-${i}`)
-                          }
+                          onClick={() => copyToClipboard(m.content, `msg-${i}`)}
                           className="flex items-center gap-1.5 px-2 py-1 text-xs text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-gray-200 hover:bg-slate-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-200"
                         >
                           {copied[`msg-${i}`] ? (
@@ -569,9 +595,7 @@ export default function PromptOptimizer({
           <div className="p-4 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-t border-slate-200/50 dark:border-gray-800/50 shadow-md">
             <div className="flex gap-2">
               <button
-                onClick={() =>
-                  copyToClipboard(latestOptimizedPrompt, "latest")
-                }
+                onClick={() => copyToClipboard(latestOptimizedPrompt, "latest")}
                 className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 dark:text-gray-300 bg-slate-100 dark:bg-gray-800 rounded-lg hover:bg-slate-200 dark:hover:bg-gray-700 transition-all duration-200 transform hover:scale-105"
               >
                 {copied["latest"] ? (
@@ -636,4 +660,3 @@ export default function PromptOptimizer({
     </div>
   );
 }
-

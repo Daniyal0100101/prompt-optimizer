@@ -18,12 +18,12 @@ interface SessionCardProps {
   formatTime: (timestamp: number) => string;
 }
 
-const SessionCard = ({ 
-  session, 
-  viewMode, 
-  onRename, 
-  onDelete, 
-  formatTime 
+const SessionCard = ({
+  session,
+  viewMode,
+  onRename,
+  onDelete,
+  formatTime,
 }: SessionCardProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -46,8 +46,12 @@ const SessionCard = ({
 
   if (isEditing) {
     return (
-      <div className={`bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-800 
-                      shadow-sm hover:shadow-md transition-all duration-200 ${viewMode === "grid" ? "p-4" : "p-3"}`}>
+      <div
+        className={`bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-800 
+                      shadow-sm hover:shadow-md transition-all duration-200 ${
+                        viewMode === "grid" ? "p-4" : "p-3"
+                      }`}
+      >
         <div className="space-y-3">
           <input
             value={editTitle}
@@ -84,8 +88,10 @@ const SessionCard = ({
 
   if (isDeleting) {
     return (
-      <div className={`bg-white dark:bg-gray-900 rounded-xl border border-red-200 dark:border-red-800 
-                      shadow-sm ${viewMode === "grid" ? "p-4" : "p-3"}`}>
+      <div
+        className={`bg-white dark:bg-gray-900 rounded-xl border border-red-200 dark:border-red-800 
+                      shadow-sm ${viewMode === "grid" ? "p-4" : "p-3"}`}
+      >
         <div className="space-y-3">
           <p className="text-sm font-medium text-slate-700 dark:text-gray-300">
             Delete &quot;{session.title}&quot;?
@@ -113,18 +119,25 @@ const SessionCard = ({
   }
 
   return (
-    <div className={`group relative bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-800
+    <div
+      className={`group relative bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-800
                     hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-lg
-                    transition-all duration-200 overflow-hidden ${viewMode === "grid" ? "p-4" : "p-3"}`}>
-      
+                    transition-all duration-200 overflow-hidden ${
+                      viewMode === "grid" ? "p-4" : "p-3"
+                    }`}
+    >
       {/* Hover accent line */}
-      <div className="absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r from-blue-500 to-indigo-500 
-                     opacity-0 group-hover:opacity-100 transition-opacity" />
+      <div
+        className="absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r from-blue-500 to-indigo-500 
+                     opacity-0 group-hover:opacity-100 transition-opacity"
+      />
 
       <Link href={`/optimize/${session.id}`} className="block">
-        <h3 className="font-semibold text-slate-900 dark:text-gray-100 line-clamp-2 mb-2 
+        <h3
+          className="font-semibold text-slate-900 dark:text-gray-100 line-clamp-2 mb-2 
                      group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors 
-                     text-sm leading-relaxed">
+                     text-sm leading-relaxed"
+        >
           {session.title || "Untitled Session"}
         </h3>
         <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-gray-500">
@@ -134,8 +147,10 @@ const SessionCard = ({
       </Link>
 
       {/* Action buttons */}
-      <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 
-                     transition-opacity duration-200">
+      <div
+        className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 
+                     transition-opacity duration-200"
+      >
         <button
           onClick={(e) => {
             e.preventDefault();

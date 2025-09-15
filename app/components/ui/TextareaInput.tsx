@@ -81,7 +81,10 @@ const TextareaInput = forwardRef<HTMLTextAreaElement, TextareaInputProps>(
               onKeyDown={handleKeyDown}
               placeholder={placeholder}
               disabled={disabled}
-              style={{ minHeight: `${minHeight}px`, maxHeight: `${maxHeight}px` }}
+              style={{
+                minHeight: `${minHeight}px`,
+                maxHeight: `${maxHeight}px`,
+              }}
               className="w-full p-5 pr-20 text-base bg-transparent border-none relative z-10
                        text-slate-900 dark:text-gray-100 transition-all duration-300 ease-out resize-none
                        placeholder:text-slate-500 dark:placeholder:text-gray-400 placeholder:font-medium

@@ -33,7 +33,7 @@ export default function RootLayout({
                 // Add a class to the document element to prevent white flash
                 document.documentElement.classList.add('js-enabled');
               })();
-            `
+            `,
           }}
         />
       </head>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import * as CryptoJS from 'crypto-js';
+import * as CryptoJS from "crypto-js";
 import { decryptSafe, getIV } from "../utils/cryptoUtils";
 import { SECRET_KEY } from "../utils/config";
 
@@ -12,16 +12,16 @@ export default function OptimizePage() {
 
   useEffect(() => {
     setIsClient(true);
-    
+
     try {
       // Check for API key before allowing access
-      const savedKey = localStorage.getItem('API_KEY');
+      const savedKey = localStorage.getItem("API_KEY");
       if (!savedKey) {
-        console.warn('No API key found in localStorage');
-        router.replace('/settings');
+        console.warn("No API key found in localStorage");
+        router.replace("/settings");
         return;
       }
-      
+
       const iv = SECRET_KEY ? getIV(SECRET_KEY) : undefined;
       const result = decryptSafe(
         savedKey,
@@ -30,20 +30,21 @@ export default function OptimizePage() {
         CryptoJS.mode.CBC,
         CryptoJS.pad.Pkcs7
       );
-      
+
       if (!result.ok || !result.plaintext) {
-        console.warn('Failed to decrypt API key');
-        router.replace('/settings');
+        console.warn("Failed to decrypt API key");
+        router.replace("/settings");
         return;
       }
-      
+
       // Generate new session ID and redirect to it
-      const newId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+      const newId = `${Date.now().toString(36)}-${Math.random()
+        .toString(36)
+        .slice(2, 8)}`;
       router.replace(`/optimize/${newId}`);
-      
     } catch (error) {
-      console.error('Error checking API key:', error);
-      router.replace('/settings');
+      console.error("Error checking API key:", error);
+      router.replace("/settings");
     }
   }, [router]);
 

@@ -1,4 +1,4 @@
-import CryptoJS from 'crypto-js';
+import CryptoJS from "crypto-js";
 
 type DecryptResult =
   | { ok: true; plaintext: string }
@@ -17,7 +17,7 @@ export const decryptSafe = (
   padding: typeof CryptoJS.pad.Pkcs7 = CryptoJS.pad.Pkcs7
 ): DecryptResult => {
   if (!encrypted) {
-    return { ok: false, reason: 'No encrypted data provided' };
+    return { ok: false, reason: "No encrypted data provided" };
   }
 
   // Allow empty string secrets to support deployments without NEXT_PUBLIC_SECRET_KEY.
@@ -28,7 +28,7 @@ export const decryptSafe = (
       padding: typeof padding;
       iv?: CryptoJS.lib.WordArray;
     } = { mode, padding };
-    
+
     if (iv) {
       options.iv = CryptoJS.enc.Utf8.parse(iv);
     }
@@ -37,14 +37,15 @@ export const decryptSafe = (
     const plaintext = decrypted.toString(CryptoJS.enc.Utf8);
 
     if (!plaintext) {
-      return { ok: false, reason: 'Decryption resulted in empty string' };
+      return { ok: false, reason: "Decryption resulted in empty string" };
     }
 
     return { ok: true, plaintext };
   } catch (error) {
-    return { 
-      ok: false, 
-      reason: error instanceof Error ? error.message : 'Unknown decryption error' 
+    return {
+      ok: false,
+      reason:
+        error instanceof Error ? error.message : "Unknown decryption error",
     };
   }
 };

@@ -114,4 +114,3 @@ export const getModelCapabilities = (modelId: ModelId) => {
 
   return capabilities[modelId];
 };
-

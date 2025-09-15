@@ -1,10 +1,10 @@
 "use client";
 
-import { ReactNode, useEffect, useState } from 'react';
-import { ThemeProvider, useTheme } from './ThemeProvider';
-import { Toaster, Analytics } from './ClientComponents';
-import Header from './Header';
-import SkipToContentLink from './SkipToContentLink';
+import { ReactNode, useEffect, useState } from "react";
+import { ThemeProvider, useTheme } from "./ThemeProvider";
+import { Toaster, Analytics } from "./ClientComponents";
+import Header from "./Header";
+import SkipToContentLink from "./SkipToContentLink";
 
 interface ClientLayoutProps {
   children: ReactNode;
@@ -44,26 +44,26 @@ function ThemedLayout({ children }: { children: ReactNode }) {
       <Toaster
         position="top-center"
         toastOptions={{
-          className: '!bg-slate-800 dark:!bg-slate-900 !text-white !shadow-lg',
+          className: "!bg-slate-800 dark:!bg-slate-900 !text-white !shadow-lg",
           style: {
-            background: 'rgb(15 23 42 / 0.95)',
-            color: '#fff',
-            backdropFilter: 'blur(12px)',
-            border: '1px solid rgb(51 65 85 / 0.5)',
-            borderRadius: '12px',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            background: "rgb(15 23 42 / 0.95)",
+            color: "#fff",
+            backdropFilter: "blur(12px)",
+            border: "1px solid rgb(51 65 85 / 0.5)",
+            borderRadius: "12px",
+            boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
           },
           duration: 4000,
           success: {
             style: {
-              background: 'rgb(5 150 105 / 0.95)',
-              border: '1px solid rgb(16 185 129 / 0.5)',
+              background: "rgb(5 150 105 / 0.95)",
+              border: "1px solid rgb(16 185 129 / 0.5)",
             },
           },
           error: {
             style: {
-              background: 'rgb(220 38 38 / 0.95)',
-              border: '1px solid rgb(239 68 68 / 0.5)',
+              background: "rgb(220 38 38 / 0.95)",
+              border: "1px solid rgb(239 68 68 / 0.5)",
             },
           },
         }}

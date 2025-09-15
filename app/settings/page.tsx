@@ -249,8 +249,8 @@ export default function SettingsPage() {
                       Get your free API key
                     </p>
                     <p className="text-blue-800/90 dark:text-blue-200/90 mb-3">
-                      Visit Google AI Studio to get your Gemini API key. It&apos;s
-                      free with generous limits.
+                      Visit Google AI Studio to get your Gemini API key.
+                      It&apos;s free with generous limits.
                     </p>
                     <a
                       href="https://aistudio.google.com/app/apikey"

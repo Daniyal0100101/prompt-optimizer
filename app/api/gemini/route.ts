@@ -23,7 +23,11 @@ interface ApiRequestBody {
  */
 function getFriendlyErrorMessage(status: number, raw: string): string {
   const msg = raw?.toLowerCase() || "";
-  if (status === 503 || msg.includes("overload") || msg.includes("service unavailable")) {
+  if (
+    status === 503 ||
+    msg.includes("overload") ||
+    msg.includes("service unavailable")
+  ) {
     return "The model is currently busy. Please try again in a moment.";
   }
   if (status === 429 || msg.includes("rate") || msg.includes("quota")) {
@@ -37,7 +41,10 @@ function getFriendlyErrorMessage(status: number, raw: string): string {
     if (/unsupported model/i.test(raw)) {
       return "This model isn't supported. Please choose another model in Settings.";
     }
-    return raw || "Your request couldn't be processed. Please check your input and try again.";
+    return (
+      raw ||
+      "Your request couldn't be processed. Please check your input and try again."
+    );
   }
   return "The service is temporarily unavailable. Please try again later.";
 }
@@ -194,7 +201,9 @@ function parseResponse(text: string | undefined): ApiResponseSuccess {
     } catch {
       return {
         optimizedPrompt: stripped || text,
-        explanations: ["Unable to parse structured response; using raw output."],
+        explanations: [
+          "Unable to parse structured response; using raw output.",
+        ],
       };
     }
   }
@@ -240,7 +249,9 @@ export async function POST(
       previousPrompt,
       refinementInstruction
     );
-    const contents: Content[] = [{ role: "user", parts: [{ text: fullPrompt }] }];
+    const contents: Content[] = [
+      { role: "user", parts: [{ text: fullPrompt }] },
+    ];
 
     const config: GenerationConfig = {
       // Default to JSON output
