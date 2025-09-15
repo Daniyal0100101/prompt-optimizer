@@ -27,7 +27,7 @@ export default function SettingsPage() {
   // Check for existing API key on mount
   useEffect(() => {
     try {
-      const saved = localStorage.getItem("gemini-api-key");
+      const saved = localStorage.getItem("API_KEY");
       setHasApiKey(!!saved);
 
       // Get selected model
@@ -249,7 +249,7 @@ export default function SettingsPage() {
                       Get your free API key
                     </p>
                     <p className="text-blue-800/90 dark:text-blue-200/90 mb-3">
-                      Visit Google AI Studio to get your Gemini API key. It's
+                      Visit Google AI Studio to get your Gemini API key. It&apos;s
                       free with generous limits.
                     </p>
                     <a

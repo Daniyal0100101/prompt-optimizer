@@ -1,85 +1,96 @@
 "use client";
 
-import React from "react";
-import dynamic from "next/dynamic";
-import { useTheme } from "./ClientComponents";
+import { ReactNode, useEffect, useState } from 'react';
+import { ThemeProvider, useTheme } from './ThemeProvider';
+import { Toaster, Analytics } from './ClientComponents';
+import Header from './Header';
+import SkipToContentLink from './SkipToContentLink';
 
-// Dynamically import components that might be affected by extensions
-const Header = dynamic(() => import("./Header"), {
-  ssr: false,
-  loading: () => (
-    <div className="h-16 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800" />
-  ),
-});
-
-const SkipToContentLink = dynamic(() => import("./SkipToContentLink"), {
-  ssr: false,
-});
-
-// Error boundary for client-side errors
-class ErrorBoundary extends React.Component<
-  { children: React.ReactNode },
-  { hasError: boolean; error?: Error }
-> {
-  constructor(props: { children: React.ReactNode }) {
-    super(props);
-    this.state = { hasError: false };
-  }
-
-  static getDerivedStateFromError(error: Error) {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error("Error in component:", error, errorInfo);
-    // Consider logging to an error reporting service
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="min-h-screen flex items-center justify-center p-4">
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6 max-w-md w-full">
-            <h2 className="text-lg font-medium text-red-800 dark:text-red-200 mb-2">
-              Something went wrong
-            </h2>
-            <p className="text-red-700 dark:text-red-300 text-sm mb-4">
-              We're sorry, but an unexpected error occurred. Please try
-              refreshing the page.
-            </p>
-            <button
-              onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium transition-colors"
-            >
-              Refresh Page
-            </button>
-          </div>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
+interface ClientLayoutProps {
+  children: ReactNode;
 }
 
-export default function ClientLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const { theme } = useTheme();
+function ThemedLayout({ children }: { children: ReactNode }) {
+  const { effectiveTheme, mounted } = useTheme();
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  if (!mounted || !isClient) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-cyan-50/30 dark:from-gray-950 dark:via-gray-900 dark:to-cyan-950/20">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-8 h-8 border-2 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin"></div>
+          <span className="text-sm text-slate-600 dark:text-gray-400 animate-pulse">
+            Loading...
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <ErrorBoundary>
-      <div className={`min-h-screen flex flex-col ${theme}`}>
-        <SkipToContentLink />
-        <Header />
-        <main
-          id="main"
-          className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-8"
-        >
-          {children}
-        </main>
+    <div className={`min-h-screen flex flex-col ${effectiveTheme}`}>
+      <SkipToContentLink />
+      <Header />
+      <main
+        id="main"
+        className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-8"
+      >
+        {children}
+      </main>
+      <Toaster
+        position="top-center"
+        toastOptions={{
+          className: '!bg-slate-800 dark:!bg-slate-900 !text-white !shadow-lg',
+          style: {
+            background: 'rgb(15 23 42 / 0.95)',
+            color: '#fff',
+            backdropFilter: 'blur(12px)',
+            border: '1px solid rgb(51 65 85 / 0.5)',
+            borderRadius: '12px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          },
+          duration: 4000,
+          success: {
+            style: {
+              background: 'rgb(5 150 105 / 0.95)',
+              border: '1px solid rgb(16 185 129 / 0.5)',
+            },
+          },
+          error: {
+            style: {
+              background: 'rgb(220 38 38 / 0.95)',
+              border: '1px solid rgb(239 68 68 / 0.5)',
+            },
+          },
+        }}
+      />
+      <Analytics />
+    </div>
+  );
+}
+
+export default function ClientLayout({ children }: ClientLayoutProps) {
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  if (!isClient) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin"></div>
       </div>
-    </ErrorBoundary>
+    );
+  }
+
+  return (
+    <ThemeProvider>
+      <ThemedLayout>{children}</ThemedLayout>
+    </ThemeProvider>
   );
 }

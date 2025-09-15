@@ -134,31 +134,36 @@ export function useTheme() {
 export const ThemeScript = () => {
   const themeScript = `
     (function() {
+      // Get saved theme or default to system
+      let savedTheme = 'system';
       try {
-        const savedTheme = localStorage.getItem('theme') || 'system';
-        let effectiveTheme = 'dark'; // Default fallback
-        
-        if (savedTheme === 'light' || savedTheme === 'dark') {
-          effectiveTheme = savedTheme;
-        } else if (savedTheme === 'system') {
-          effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-        }
-        
-        // Apply theme immediately
-        document.documentElement.classList.toggle('dark', effectiveTheme === 'dark');
-        document.documentElement.setAttribute('data-theme', effectiveTheme);
+        savedTheme = localStorage.getItem('theme') || 'system';
       } catch (e) {
-        // Fallback to dark theme
-        document.documentElement.classList.add('dark');
-        document.documentElement.setAttribute('data-theme', 'dark');
+        console.warn('Could not access localStorage:', e);
       }
+      
+      let effectiveTheme = 'dark'; // Default fallback
+      
+      if (savedTheme === 'light' || savedTheme === 'dark') {
+        effectiveTheme = savedTheme;
+      } else if (savedTheme === 'system') {
+        try {
+          effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        } catch (e) {
+          console.warn('Could not determine system color scheme:', e);
+        }
+      }
+      
+      // Apply theme immediately
+      document.documentElement.classList.toggle('dark', effectiveTheme === 'dark');
+      document.documentElement.setAttribute('data-theme', effectiveTheme);
     })();
   `;
 
   return (
     <script
-      id="theme-script"
       dangerouslySetInnerHTML={{ __html: themeScript }}
+      suppressHydrationWarning
     />
   );
 };

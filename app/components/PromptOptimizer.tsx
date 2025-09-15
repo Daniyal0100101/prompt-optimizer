@@ -1,5 +1,3 @@
-"use client";
-
 import {
   useEffect,
   useRef,
@@ -7,6 +5,7 @@ import {
   useCallback,
   FormEvent,
   KeyboardEvent,
+  useMemo,
 } from "react";
 import {
   FiCopy,
@@ -20,7 +19,6 @@ import {
   FiUser,
   FiCpu,
   FiMenu,
-  FiX,
   FiHome,
   FiSettings,
 } from "react-icons/fi";
@@ -28,19 +26,53 @@ import { toast } from "react-hot-toast";
 import * as CryptoJS from "crypto-js";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { getSelectedModel } from "../utils/modelConfig";
+import { getSelectedModel, ModelId } from "../utils/modelConfig";
+import { SECRET_KEY } from "../utils/config";
+import { decryptSafe } from "../utils/cryptoUtils";
+import EmptyState from "./ui/EmptyState";
+import SessionCard from "./ui/SessionCard";
 
-const SECRET_KEY = "uJioow3SoPYeAG3iEBRGlSAdFMi8C10AfZVrw3X_4dg=";
+if (!process.env.NEXT_PUBLIC_SECRET_KEY) {
+  console.warn("NEXT_PUBLIC_SECRET_KEY is not defined in environment variables");
+}
+
+// --- Type Definitions ---
+
+interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+  explanations?: string[];
+}
+
+interface Session {
+  id: string;
+  title: string;
+  updatedAt: number;
+}
 
 interface PromptOptimizerProps {
   apiKey?: string;
 }
 
-type ChatMessage = {
-  role: "user" | "assistant";
-  content: string;
-  explanations?: string[];
+// --- Helper Functions ---
+
+const newId = () =>
+  `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+const formatRelativeTime = (timestamp: number): string => {
+  const diff = Date.now() - timestamp;
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days < 30) return `${days}d ago`;
+  return new Date(timestamp).toLocaleDateString();
 };
+
+// --- Main Component ---
 
 export default function PromptOptimizer({
   apiKey: apiKeyProp,
@@ -49,64 +81,87 @@ export default function PromptOptimizer({
   const router = useRouter();
   const sessionId = (params?.id as string) || "";
 
-  // State
+  // --- State Management ---
   const [isLoading, setIsLoading] = useState(false);
   const [isApiKeyValid, setIsApiKeyValid] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<string>("");
+  const [selectedModel, setSelectedModel] = useState<ModelId>("gemini-1.5-flash");
   const [apiKey, setApiKey] = useState(apiKeyProp || "");
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [copied, setCopied] = useState<{ [key: number]: boolean }>({});
-  const FIXED_BACKEND_MODEL = "gemini-1.5-flash";
-  const [sessions, setSessions] = useState<
-    { id: string; title: string; updatedAt: number }[]
-  >([]);
+  const [copied, setCopied] = useState<{ [key: string]: boolean }>({});
+  const [sessions, setSessions] = useState<Session[]>([]);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const chatEndRef = useRef<HTMLDivElement | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const [loadingSession, setLoadingSession] = useState(true);
-  const saveTimer = useRef<number | null>(null);
+    const [loadingSession, setLoadingSession] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  // --- Core Logic ---
+  // --- Refs ---
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const saveTimer = useRef<NodeJS.Timeout | null>(null);
 
-  const loadApiKeyFromStorage = useCallback(() => {
+  // --- Memoized Values ---
+  const latestOptimizedPrompt = useMemo(
+    () =>
+      messages.filter((m) => m.role === "assistant").slice(-1)[0]?.content || "",
+    [messages]
+  );
+
+  // --- Callbacks and Effects ---
+  const loadSettingsFromStorage = useCallback(() => {
     if (typeof window === "undefined") return;
     try {
-      const saved = localStorage.getItem("gemini-api-key");
-      if (saved) {
-        const decrypted = CryptoJS.AES.decrypt(saved, SECRET_KEY).toString(
-          CryptoJS.enc.Utf8
+      const savedKey = localStorage.getItem("API_KEY");
+      if (savedKey) {
+        const result = decryptSafe(
+          savedKey,
+          SECRET_KEY,
+          undefined,
+          CryptoJS.mode.CBC,
+          CryptoJS.pad.Pkcs7
         );
-        if (decrypted) setApiKey(decrypted);
+        
+        if (result.ok && result.plaintext) {
+          setApiKey(result.plaintext);
+          setIsApiKeyValid(true);
+        } else {
+          console.warn('Failed to decrypt API key');
+          if (!result.ok) {
+            const errorResult = result as { reason?: string };
+            console.warn('Reason:', errorResult.reason || 'Unknown error');
+          }
+          setIsApiKeyValid(false);
+        }
+      } else {
+        console.warn('No API key found in localStorage');
+        setIsApiKeyValid(false);
       }
-
-      const model = getSelectedModel();
-      setSelectedModel(model);
+      setSelectedModel(getSelectedModel());
     } catch (e) {
       console.error("Failed to load settings from storage", e);
+      // Clear potentially corrupted key
+      localStorage.removeItem("API_KEY");
+      setIsApiKeyValid(false);
     }
   }, []);
 
   useEffect(() => {
     if (!apiKeyProp) {
-      loadApiKeyFromStorage();
+      loadSettingsFromStorage();
+    } else {
+      setApiKey(apiKeyProp);
+      setIsApiKeyValid(true);
     }
-  }, [apiKeyProp, loadApiKeyFromStorage]);
+  }, [apiKeyProp, loadSettingsFromStorage]);
 
-  useEffect(() => {
-    setIsApiKeyValid(Boolean(apiKeyProp || apiKey));
-  }, [apiKeyProp, apiKey]);
-
+  // Load sessions and current chat from localStorage
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
       const rawList = localStorage.getItem("chat_sessions");
-      const listParsed: { id: string; title: string; updatedAt: number }[] =
-        rawList ? JSON.parse(rawList) : [];
-      if (rawList) setSessions(listParsed);
+      const listParsed: Session[] = rawList ? JSON.parse(rawList) : [];
+      setSessions(listParsed);
 
       setLoadingSession(true);
       setMessages([]);
@@ -119,90 +174,87 @@ export default function PromptOptimizer({
           : [];
         setMessages(loadedMessages);
       }
-      setLoadingSession(false);
     } catch (e) {
       console.warn("Failed to load session data", e);
+    } finally {
       setLoadingSession(false);
     }
   }, [sessionId]);
 
-  const latestOptimizedPrompt =
-    messages.filter((m) => m.role === "assistant").slice(-1)[0]?.content || "";
-
+  // Auto-save session to localStorage
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!sessionId || loadingSession || messages.length === 0) return;
+    if (typeof window === "undefined" || !sessionId || loadingSession) return;
 
-    if (saveTimer.current) window.clearTimeout(saveTimer.current);
-    saveTimer.current = window.setTimeout(() => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+
+    saveTimer.current = setTimeout(() => {
+      if (messages.length === 0) return;
+
       try {
-        const existingRaw = localStorage.getItem(`chat:${sessionId}`);
-        const nextPayload = { messages };
-        if (
-          existingRaw &&
-          JSON.stringify(JSON.parse(existingRaw)) ===
-            JSON.stringify(nextPayload)
-        ) {
-          return;
-        }
+        const payload = { messages };
+        localStorage.setItem(`chat:${sessionId}`, JSON.stringify(payload));
 
-        localStorage.setItem(`chat:${sessionId}`, JSON.stringify(nextPayload));
+        const firstUserMessage = messages.find((m) => m.role === "user");
+        const title = (firstUserMessage?.content || "New Chat").slice(0, 80);
 
-        const firstUser = messages.find((m) => m.role === "user");
-        const title = (firstUser?.content || "New Optimization").slice(0, 80);
-        const list = [...sessions];
-        const idx = list.findIndex((s) => s.id === sessionId);
-        const entry = { id: sessionId, title, updatedAt: Date.now() };
+        setSessions((prevSessions) => {
+          const existingIndex = prevSessions.findIndex((s) => s.id === sessionId);
+          const newEntry: Session = { id: sessionId, title, updatedAt: Date.now() };
 
-        if (idx >= 0) list[idx] = entry;
-        else list.unshift(entry);
+          let updatedSessions;
+          if (existingIndex >= 0) {
+            updatedSessions = [...prevSessions];
+            updatedSessions[existingIndex] = newEntry;
+          } else {
+            updatedSessions = [newEntry, ...prevSessions];
+          }
 
-        const sortedList = list.sort((a, b) => b.updatedAt - a.updatedAt);
-        setSessions(sortedList);
-        localStorage.setItem("chat_sessions", JSON.stringify(sortedList));
+          const sorted = updatedSessions.sort((a, b) => b.updatedAt - a.updatedAt);
+          localStorage.setItem("chat_sessions", JSON.stringify(sorted));
+          return sorted;
+        });
       } catch (e) {
         console.warn("Failed to save session data", e);
       }
     }, 500);
 
     return () => {
-      if (saveTimer.current) window.clearTimeout(saveTimer.current);
+      if (saveTimer.current) clearTimeout(saveTimer.current);
     };
-  }, [sessionId, messages, loadingSession, sessions]);
+  }, [sessionId, messages, loadingSession]);
 
   const handleOptimize = async (isRefinement = false, instruction?: string) => {
     if (!isApiKeyValid) {
-      toast.error("Please configure your API key in Settings");
+      toast.error("Please configure your API key in Settings.");
       return;
     }
-    if (!isRefinement && !input.trim()) {
-      toast.error("Please enter a prompt to optimize");
-      return;
-    }
-    if (isRefinement && !(instruction || "").trim()) {
-      toast.error("Please enter refinement instructions");
+    const content = (isRefinement ? instruction : input)?.trim();
+    if (!content) {
+      toast.error(
+        isRefinement
+          ? "Please enter refinement instructions."
+          : "Please enter a prompt to optimize."
+      );
       return;
     }
 
     setIsLoading(true);
-    const userMessageContent = isRefinement ? instruction || "" : input.trim();
-    const currentMessages = [
-      ...messages,
-      { role: "user", content: userMessageContent },
-    ] as ChatMessage[];
+    const userMessage: ChatMessage = { role: "user", content };
+    const currentMessages = [...messages, userMessage];
     setMessages(currentMessages);
     setInput("");
 
     try {
-      const payload: any = {
-        prompt: isRefinement ? latestOptimizedPrompt : input,
-        model: selectedModel || FIXED_BACKEND_MODEL,
+      const payload = {
+        model: selectedModel,
         apiKey,
+        ...(isRefinement
+          ? {
+              refinementInstruction: content,
+              previousPrompt: latestOptimizedPrompt || input,
+            }
+          : { prompt: content }),
       };
-      if (isRefinement) {
-        payload.refinementInstruction = instruction;
-        payload.previousPrompt = latestOptimizedPrompt || input;
-      }
 
       const response = await fetch("/api/gemini", {
         method: "POST",
@@ -210,12 +262,12 @@ export default function PromptOptimizer({
         body: JSON.stringify(payload),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "Failed to process your request");
+        throw new Error(data.error || "Failed to process your request.");
       }
 
-      const data = await response.json();
       const newAssistantMessage: ChatMessage = {
         role: "assistant",
         content: data.optimizedPrompt || "",
@@ -224,9 +276,11 @@ export default function PromptOptimizer({
 
       setMessages([...currentMessages, newAssistantMessage]);
       toast.success(isRefinement ? "Prompt refined" : "Prompt optimized");
-    } catch (error: any) {
-      console.error("Optimization error:", error);
-      toast.error(error.message || "An error occurred");
+    } catch (error: unknown) {
+      const errorMessage = (error as Error).message || "An unknown error occurred.";
+      console.error("Optimization error:", errorMessage);
+      toast.error(errorMessage);
+      // Revert to previous state on error
       setMessages(messages);
     } finally {
       setIsLoading(false);
@@ -240,29 +294,26 @@ export default function PromptOptimizer({
     handleOptimize(hasAssistantReply, input);
   };
 
-  const copyToClipboard = (text: string, messageIndex: number) => {
-    if (typeof navigator !== "undefined" && navigator.clipboard) {
-      navigator.clipboard.writeText(text);
-      setCopied((prev) => ({ ...prev, [messageIndex]: true }));
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied((prev) => ({ ...prev, [id]: true }));
       toast.success("Copied to clipboard");
-      setTimeout(() => {
-        setCopied((prev) => ({ ...prev, [messageIndex]: false }));
-      }, 2000);
-    }
+      setTimeout(() => setCopied((prev) => ({ ...prev, [id]: false })), 2000);
+    });
   };
 
   const startNewOptimization = () => {
-    router.push("/optimize");
+    router.push(`/optimize/${newId()}`);
   };
 
   const deleteSession = (id: string) => {
-    const list = sessions.filter((s) => s.id !== id);
-    setSessions(list);
-    if (typeof window !== "undefined") {
-      try {
-        localStorage.setItem("chat_sessions", JSON.stringify(list));
-        localStorage.removeItem(`chat:${id}`);
-      } catch {}
+    const updatedSessions = sessions.filter((s) => s.id !== id);
+    setSessions(updatedSessions);
+    try {
+      localStorage.setItem("chat_sessions", JSON.stringify(updatedSessions));
+      localStorage.removeItem(`chat:${id}`);
+    } catch (e) {
+      console.warn("Error deleting session:", e);
     }
     if (id === sessionId) {
       router.push("/");
@@ -271,13 +322,15 @@ export default function PromptOptimizer({
   };
 
   const saveRename = (id: string) => {
-    const title = editingTitle.trim() || "Untitled";
-    const list = sessions.map((s) => (s.id === id ? { ...s, title } : s));
-    setSessions(list);
-    if (typeof window !== "undefined") {
-      try {
-        localStorage.setItem("chat_sessions", JSON.stringify(list));
-      } catch {}
+    const title = editingTitle.trim() || "Untitled Chat";
+    const updatedSessions = sessions.map((s) =>
+      s.id === id ? { ...s, title } : s
+    );
+    setSessions(updatedSessions);
+    try {
+      localStorage.setItem("chat_sessions", JSON.stringify(updatedSessions));
+    } catch (e) {
+      console.warn("Error renaming session:", e);
     }
     setEditingId(null);
     setEditingTitle("");
@@ -291,7 +344,7 @@ export default function PromptOptimizer({
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
       const scrollHeight = textareaRef.current.scrollHeight;
-      const maxHeight = 160;
+      const maxHeight = 160; // 10rem
       textareaRef.current.style.height = `${Math.min(
         scrollHeight,
         maxHeight
@@ -304,19 +357,6 @@ export default function PromptOptimizer({
       e.preventDefault();
       handleSend(e as unknown as FormEvent);
     }
-  };
-
-  const formatRelativeTime = (timestamp: number) => {
-    const diff = Date.now() - timestamp;
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
-
-    if (minutes < 1) return "Just now";
-    if (minutes < 60) return `${minutes}m ago`;
-    if (hours < 24) return `${hours}h ago`;
-    if (days < 30) return `${days}d ago`;
-    return new Date(timestamp).toLocaleDateString();
   };
 
   // --- Render Components ---
@@ -357,109 +397,46 @@ export default function PromptOptimizer({
 
       <div className="flex-1 overflow-y-auto p-4">
         {sessions.length === 0 ? (
-          <div className="text-center text-sm text-slate-500 dark:text-gray-500 mt-8 animate-fade-in">
-            <FiMessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
-            <p>No conversations yet</p>
-          </div>
+          <EmptyState
+            icon={<FiMessageSquare className="w-6 h-6 text-white" />}
+            title="No conversations yet"
+            description="Start a new optimization to see your chat history here."
+            className="mt-8"
+          />
         ) : (
           <div className="space-y-2">
             {sessions.map((s) => (
-              <div key={s.id} className="group relative">
-                {editingId === s.id ? (
-                  <div className="p-3 border border-blue-300 rounded-lg bg-blue-50 dark:bg-blue-950/20">
-                    <input
-                      value={editingTitle}
-                      onChange={(e) => setEditingTitle(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") saveRename(s.id);
-                        if (e.key === "Escape") {
-                          setEditingId(null);
-                          setEditingTitle("");
-                        }
-                      }}
-                      className="w-full text-sm bg-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      autoFocus
-                    />
-                    <div className="flex gap-2 mt-2">
-                      <button
-                        onClick={() => saveRename(s.id)}
-                        className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-all duration-200"
-                      >
-                        Save
-                      </button>
-                      <button
-                        onClick={() => {
-                          setEditingId(null);
-                          setEditingTitle("");
-                        }}
-                        className="px-2 py-1 text-xs bg-slate-200 dark:bg-gray-700 rounded hover:bg-slate-300 dark:hover:bg-gray-600 transition-all duration-200"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                ) : confirmDeleteId === s.id ? (
-                  <div className="p-3 border border-red-300 rounded-lg bg-red-50 dark:bg-red-950/20">
-                    <p className="text-sm text-red-800 dark:text-red-200 mb-2">
-                      Delete this chat?
-                    </p>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => deleteSession(s.id)}
-                        className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition-all duration-200"
-                      >
-                        Delete
-                      </button>
-                      <button
-                        onClick={() => setConfirmDeleteId(null)}
-                        className="px-2 py-1 text-xs bg-slate-200 dark:bg-gray-700 rounded hover:bg-slate-300 dark:hover:bg-gray-600 transition-all duration-200"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <Link
-                    href={`/optimize/${s.id}`}
-                    className={`block p-3 rounded-lg transition-all duration-200 transform hover:scale-102 ${
-                      s.id === sessionId
-                        ? "bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 shadow-md"
-                        : "hover:bg-slate-50 dark:hover:bg-gray-800"
-                    }`}
-                  >
-                    <p className="text-sm font-medium text-slate-900 dark:text-gray-100 truncate mb-1">
-                      {s.title || "Untitled Chat"}
-                    </p>
-                    <p className="text-xs text-slate-500 dark:text-gray-500">
-                      {formatRelativeTime(s.updatedAt)}
-                    </p>
-                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex gap-1">
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setEditingId(s.id);
-                          setEditingTitle(s.title || "");
-                        }}
-                        className="p-1 rounded hover:bg-slate-200 dark:hover:bg-gray-700 transition-all duration-200"
-                        title="Rename"
-                      >
-                        <FiEdit2 className="w-3 h-3" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setConfirmDeleteId(s.id);
-                        }}
-                        className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 transition-all duration-200"
-                        title="Delete"
-                      >
-                        <FiTrash2 className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </Link>
-                )}
+              <div key={s.id} className={`${s.id === sessionId ? 'ring-2 ring-blue-200 dark:ring-blue-800' : ''}`}>
+                <SessionCard
+                  session={s}
+                  viewMode="list"
+                  onRename={(id, newTitle) => {
+                    const title = newTitle.trim() || "Untitled Chat";
+                    const updatedSessions = sessions.map((session) =>
+                      session.id === id ? { ...session, title } : session
+                    );
+                    setSessions(updatedSessions);
+                    try {
+                      localStorage.setItem("chat_sessions", JSON.stringify(updatedSessions));
+                    } catch (e) {
+                      console.warn("Error renaming session:", e);
+                    }
+                  }}
+                  onDelete={(id) => {
+                    const updatedSessions = sessions.filter((session) => session.id !== id);
+                    setSessions(updatedSessions);
+                    try {
+                      localStorage.setItem("chat_sessions", JSON.stringify(updatedSessions));
+                      localStorage.removeItem(`chat:${id}`);
+                    } catch (e) {
+                      console.warn("Error deleting session:", e);
+                    }
+                    if (id === sessionId) {
+                      router.push("/");
+                    }
+                  }}
+                  formatTime={formatRelativeTime}
+                />
               </div>
             ))}
           </div>
@@ -474,6 +451,7 @@ export default function PromptOptimizer({
         <div
           className="fixed inset-0 z-30 bg-black/50 lg:hidden"
           onClick={() => setIsHistoryOpen(false)}
+          aria-label="Close sidebar overlay"
         />
       )}
 
@@ -525,17 +503,13 @@ export default function PromptOptimizer({
               </div>
             </div>
           ) : messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center px-6 animate-fade-in">
-              <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-indigo-200 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
-                <FiMessageSquare className="w-8 h-8 text-blue-600 dark:text-indigo-400" />
-              </div>
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-gray-100 mb-2">
-                Ready to optimize
-              </h2>
-              <p className="text-slate-600 dark:text-gray-400 max-w-md">
-                Enter a prompt below and let AI transform it into a
-                high-performance instruction
-              </p>
+            <div className="flex items-center justify-center h-full px-6">
+              <EmptyState
+                icon={<FiMessageSquare className="w-8 h-8 text-white" />}
+                title="Ready to Optimize"
+                description="Enter a prompt below and let AI transform it into a high-performance instruction."
+                className="max-w-md"
+              />
             </div>
           ) : (
             <div className="p-4 space-y-6">
@@ -564,15 +538,17 @@ export default function PromptOptimizer({
                     {m.role === "assistant" && (
                       <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-200 dark:border-gray-700">
                         <button
-                          onClick={() => copyToClipboard(m.content, i)}
+                          onClick={() =>
+                            copyToClipboard(m.content, `msg-${i}`)
+                          }
                           className="flex items-center gap-1.5 px-2 py-1 text-xs text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-gray-200 hover:bg-slate-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-200"
                         >
-                          {copied[i] ? (
+                          {copied[`msg-${i}`] ? (
                             <FiCheckCircle className="w-3 h-3" />
                           ) : (
                             <FiCopy className="w-3 h-3" />
                           )}
-                          {copied[i] ? "Copied" : "Copy"}
+                          {copied[`msg-${i}`] ? "Copied" : "Copy"}
                         </button>
                       </div>
                     )}
@@ -624,10 +600,12 @@ export default function PromptOptimizer({
           <div className="p-4 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-t border-slate-200/50 dark:border-gray-800/50 shadow-md">
             <div className="flex gap-2">
               <button
-                onClick={() => copyToClipboard(latestOptimizedPrompt, -1)}
+                onClick={() =>
+                  copyToClipboard(latestOptimizedPrompt, "latest")
+                }
                 className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 dark:text-gray-300 bg-slate-100 dark:bg-gray-800 rounded-lg hover:bg-slate-200 dark:hover:bg-gray-700 transition-all duration-200 transform hover:scale-105"
               >
-                {copied[-1] ? (
+                {copied["latest"] ? (
                   <FiCheckCircle className="w-4 h-4" />
                 ) : (
                   <FiCopy className="w-4 h-4" />
@@ -665,6 +643,7 @@ export default function PromptOptimizer({
                        placeholder:text-slate-500 dark:placeholder:text-gray-500 transition-all duration-200"
               rows={1}
               disabled={!isApiKeyValid}
+              aria-label="Prompt input"
             />
             <button
               type="submit"
@@ -672,6 +651,7 @@ export default function PromptOptimizer({
               className="px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-xl hover:from-blue-700 hover:to-indigo-800 
                        disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-105
                        flex items-center gap-2 font-medium"
+              aria-label="Send prompt"
             >
               <FiSend className="w-4 h-4" />
               <span className="hidden sm:inline">Send</span>
@@ -687,3 +667,4 @@ export default function PromptOptimizer({
     </div>
   );
 }
+

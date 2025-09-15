@@ -1,4 +1,3 @@
-// List of supported Gemini models with their capabilities
 export type ModelId =
   | "gemini-1.5-flash"
   | "gemini-2.0-flash"
@@ -115,3 +114,4 @@ export const getModelCapabilities = (modelId: ModelId) => {
 
   return capabilities[modelId];
 };
+

@@ -1,33 +1,73 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import * as CryptoJS from "crypto-js";
+import * as CryptoJS from 'crypto-js';
+import { decryptSafe } from "../utils/cryptoUtils";
 
-const SECRET_KEY = "uJioow3SoPYeAG3iEBRGlSAdFMi8C10AfZVrw3X_4dg=";
+const SECRET_KEY = process.env.NEXT_PUBLIC_SECRET_KEY as string;
 
-function newId() {
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+if (!SECRET_KEY) {
+  throw new Error("NEXT_PUBLIC_SECRET_KEY is not defined");
 }
 
 export default function OptimizePage() {
   const router = useRouter();
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
+    setIsClient(true);
+    
     try {
-      const saved = localStorage.getItem("gemini-api-key");
-      const decrypted = saved
-        ? CryptoJS.AES.decrypt(saved, SECRET_KEY).toString(CryptoJS.enc.Utf8)
-        : "";
-      if (!decrypted) {
-        router.replace("/settings");
+      // Check for API key before allowing access
+      const savedKey = localStorage.getItem('API_KEY');
+      if (!savedKey) {
+        console.warn('No API key found in localStorage');
+        router.replace('/settings');
         return;
       }
-      router.replace(`/optimize/${newId()}`);
-    } catch {
-      router.replace("/settings");
+      
+      const result = decryptSafe(
+        savedKey,
+        SECRET_KEY,
+        undefined,
+        CryptoJS.mode.CBC,
+        CryptoJS.pad.Pkcs7
+      );
+      
+      if (!result.ok || !result.plaintext) {
+        console.warn('Failed to decrypt API key');
+        router.replace('/settings');
+        return;
+      }
+      
+      // Generate new session ID and redirect to it
+      const newId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+      router.replace(`/optimize/${newId}`);
+      
+    } catch (error) {
+      console.error('Error checking API key:', error);
+      router.replace('/settings');
     }
   }, [router]);
 
-  return null;
+  if (!isClient) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="flex items-center gap-2 text-slate-500 dark:text-gray-400">
+          <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+          <span>Loading...</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="flex items-center gap-2 text-slate-500 dark:text-gray-400">
+        <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+        <span>Creating new optimization session...</span>
+      </div>
+    </div>
+  );
 }
