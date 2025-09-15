@@ -2,6 +2,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import ClientLayout from "./components/ClientLayout";
 import { ThemeScript } from "./components/ClientComponents";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
@@ -42,6 +43,7 @@ export default function RootLayout({
         className={`${inter.variable} font-sans bg-gradient-to-br from-slate-50 via-white to-cyan-50/30 dark:from-gray-950 dark:via-gray-900 dark:to-cyan-950/20 text-slate-900 dark:text-gray-100 transition-colors min-h-screen`}
       >
         <ClientLayout>{children}</ClientLayout>
+        <SpeedInsights />
       </body>
     </html>
   );
