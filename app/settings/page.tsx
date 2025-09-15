@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import ApiKeyInput from "../components/ApiKeyInput";
 import { useRouter } from "next/navigation";
-import { useTheme, ThemeMode } from "../components/ClientComponents";
+import { useTheme, ThemeMode } from "../components/ThemeProvider";
 import {
   FiSun,
   FiMoon,

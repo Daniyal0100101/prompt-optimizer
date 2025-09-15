@@ -3,13 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import * as CryptoJS from 'crypto-js';
-import { decryptSafe } from "../utils/cryptoUtils";
-
-const SECRET_KEY = process.env.NEXT_PUBLIC_SECRET_KEY as string;
-
-if (!SECRET_KEY) {
-  throw new Error("NEXT_PUBLIC_SECRET_KEY is not defined");
-}
+import { decryptSafe, getIV } from "../utils/cryptoUtils";
+import { SECRET_KEY } from "../utils/config";
 
 export default function OptimizePage() {
   const router = useRouter();
@@ -27,10 +22,11 @@ export default function OptimizePage() {
         return;
       }
       
+      const iv = SECRET_KEY ? getIV(SECRET_KEY) : undefined;
       const result = decryptSafe(
         savedKey,
         SECRET_KEY,
-        undefined,
+        iv,
         CryptoJS.mode.CBC,
         CryptoJS.pad.Pkcs7
       );

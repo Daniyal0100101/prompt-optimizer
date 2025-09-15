@@ -12,8 +12,6 @@ import {
   FiCheckCircle,
   FiRefreshCw,
   FiSend,
-  FiEdit2,
-  FiTrash2,
   FiPlus,
   FiMessageSquare,
   FiUser,
@@ -92,9 +90,7 @@ export default function PromptOptimizer({
   const [sessions, setSessions] = useState<Session[]>([]);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     const [loadingSession, setLoadingSession] = useState(true);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingTitle, setEditingTitle] = useState("");
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  // Removed inline rename/delete state in favor of reusable SessionCard component
 
   // --- Refs ---
   const chatEndRef = useRef<HTMLDivElement | null>(null);
@@ -306,35 +302,7 @@ export default function PromptOptimizer({
     router.push(`/optimize/${newId()}`);
   };
 
-  const deleteSession = (id: string) => {
-    const updatedSessions = sessions.filter((s) => s.id !== id);
-    setSessions(updatedSessions);
-    try {
-      localStorage.setItem("chat_sessions", JSON.stringify(updatedSessions));
-      localStorage.removeItem(`chat:${id}`);
-    } catch (e) {
-      console.warn("Error deleting session:", e);
-    }
-    if (id === sessionId) {
-      router.push("/");
-    }
-    setConfirmDeleteId(null);
-  };
-
-  const saveRename = (id: string) => {
-    const title = editingTitle.trim() || "Untitled Chat";
-    const updatedSessions = sessions.map((s) =>
-      s.id === id ? { ...s, title } : s
-    );
-    setSessions(updatedSessions);
-    try {
-      localStorage.setItem("chat_sessions", JSON.stringify(updatedSessions));
-    } catch (e) {
-      console.warn("Error renaming session:", e);
-    }
-    setEditingId(null);
-    setEditingTitle("");
-  };
+  // Renaming and deletion are handled within SessionCard mapped items below
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });

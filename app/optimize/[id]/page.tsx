@@ -4,9 +4,8 @@ import PromptOptimizer from "../../components/PromptOptimizer";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import * as CryptoJS from 'crypto-js';
-import { decryptSafe } from "../../utils/cryptoUtils";
-
-const SECRET_KEY = 'uJioow3SoPYeAG3iEBRGlSAdFMi8C10AfZVrw3X_4dg=';
+import { decryptSafe, getIV } from "../../utils/cryptoUtils";
+import { SECRET_KEY } from "../../utils/config";
 
 export default function OptimizeSessionPage() {
   const router = useRouter();
@@ -28,10 +27,11 @@ export default function OptimizeSessionPage() {
       }
       
       try {
+        const iv = SECRET_KEY ? getIV(SECRET_KEY) : undefined;
         const result = decryptSafe(
           saved,
           SECRET_KEY,
-          undefined,
+          iv,
           CryptoJS.mode.CBC,
           CryptoJS.pad.Pkcs7
         );

@@ -4,6 +4,11 @@ type DecryptResult =
   | { ok: true; plaintext: string }
   | { ok: false; reason: string };
 
+// Derive a 16-byte IV from a secret using SHA-256 (first 16 chars)
+export const getIV = (secret: string): string => {
+  return CryptoJS.SHA256(secret).toString().substring(0, 16);
+};
+
 export const decryptSafe = (
   encrypted: string | CryptoJS.lib.CipherParams,
   secret: string,

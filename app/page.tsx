@@ -13,17 +13,14 @@ import { HiOutlineSparkles } from "react-icons/hi2";
 import { useRouter } from "next/navigation";
 import * as CryptoJS from "crypto-js";
 import { toast } from "react-hot-toast";
-import { decryptSafe } from "./utils/cryptoUtils";
+import { decryptSafe, getIV } from "./utils/cryptoUtils";
+import { SECRET_KEY } from "./utils/config";
 import TextareaInput from "./components/ui/TextareaInput";
 import QuickPrompts from "./components/ui/QuickPrompts";
 import EmptyState from "./components/ui/EmptyState";
 import SessionCard from "./components/ui/SessionCard";
 
-const SECRET_KEY = process.env.NEXT_PUBLIC_SECRET_KEY as string;
-
-if (!SECRET_KEY) {
-  throw new Error("NEXT_PUBLIC_SECRET_KEY is not defined");
-}
+// SECRET_KEY is provided via utils/config with a safe fallback warning
 
 // --- Type Definitions ---
 
@@ -58,55 +55,62 @@ export default function Home() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [homeInput, setHomeInput] = useState("");
   const [isStarting, setIsStarting] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingTitle, setEditingTitle] = useState("");
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchFilter, setSearchFilter] = useState("");
-  const [isFocused, setIsFocused] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const router = useRouter();
 
   useEffect(() => {
+    // Check for API key
     try {
-      // Check for API key
       const savedKey = localStorage.getItem("API_KEY");
       if (savedKey) {
+        const iv = SECRET_KEY ? getIV(SECRET_KEY) : undefined;
         const result = decryptSafe(
           savedKey,
           SECRET_KEY,
-          undefined, // IV will be handled by decryptSafe
+          iv,
           CryptoJS.mode.CBC,
           CryptoJS.pad.Pkcs7
         );
-        
+
         if (result.ok && result.plaintext) {
           setHasKey(true);
         } else {
-          console.warn('Failed to decrypt API key');
+          console.warn("Failed to decrypt API key");
           if (!result.ok) {
             const errorResult = result as { reason?: string };
-            console.warn('Reason:', errorResult.reason || 'Unknown error');
+            console.warn("Reason:", errorResult.reason || "Unknown error");
           }
           setHasKey(false);
         }
+      } else {
+        setHasKey(false);
       }
+    } catch (error) {
+      console.error("Error checking API key", error);
+      setHasKey(false);
+    }
 
+    // Load sessions separately; if parsing fails, do not affect API key
+    try {
       const rawSessions = localStorage.getItem("chat_sessions");
       if (rawSessions) {
         setSessions(JSON.parse(rawSessions));
       }
+    } catch (error) {
+      console.warn("Failed to parse chat_sessions; clearing it.", error);
+      localStorage.removeItem("chat_sessions");
+    }
 
+    // Load view mode
+    try {
       const savedView = localStorage.getItem("view_mode");
       if (savedView === "list" || savedView === "grid") {
         setViewMode(savedView);
       }
     } catch (error) {
-      console.error("Error loading from localStorage", error);
-      // Clear potentially corrupted data
-      localStorage.removeItem("API_KEY");
-      localStorage.removeItem("chat_sessions");
-      setHasKey(false);
+      console.warn("Failed to load view_mode", error);
     }
   }, []);
 
@@ -128,8 +132,8 @@ export default function Home() {
     }
   }, []);
 
-  const handleStartFromHome = async (e: FormEvent) => {
-    e.preventDefault();
+  const handleStartFromHome = async (e?: FormEvent) => {
+    e?.preventDefault();
     const text = homeInput.trim();
     if (!text || isStarting) return;
 
@@ -148,10 +152,11 @@ export default function Home() {
         throw new Error("API key not found in localStorage.");
       }
 
+      const iv = SECRET_KEY ? getIV(SECRET_KEY) : undefined;
       const result = decryptSafe(
         savedKey,
         SECRET_KEY,
-        undefined,
+        iv,
         CryptoJS.mode.CBC,
         CryptoJS.pad.Pkcs7
       );
@@ -204,25 +209,7 @@ export default function Home() {
     }
   };
 
-  const saveRename = (id: string) => {
-    const updatedSessions = sessions.map((s) =>
-      s.id === id ? { ...s, title: editingTitle.trim() || "Untitled" } : s
-    );
-    persistSessions(updatedSessions);
-    setEditingId(null);
-    setEditingTitle("");
-  };
-
-  const deleteSession = (id: string) => {
-    const updatedSessions = sessions.filter((s) => s.id !== id);
-    persistSessions(updatedSessions);
-    try {
-      localStorage.removeItem(`chat:${id}`);
-    } catch (error) {
-      console.error("Failed to remove session item", error);
-    }
-    setConfirmDeleteId(null);
-  };
+  // Session rename/delete are handled inside SessionCard component mapping below
 
   const toggleViewMode = () => {
     const newMode = viewMode === "grid" ? "list" : "grid";
@@ -282,7 +269,7 @@ export default function Home() {
             ref={textareaRef}
             value={homeInput}
             onChange={setHomeInput}
-            onSubmit={() => handleStartFromHome({} as FormEvent)}
+            onSubmit={handleStartFromHome}
             placeholder={
               hasKey
                 ? "What would you like to optimize today?"

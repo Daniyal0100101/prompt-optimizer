@@ -88,7 +88,7 @@ const SessionCard = ({
                       shadow-sm ${viewMode === "grid" ? "p-4" : "p-3"}`}>
         <div className="space-y-3">
           <p className="text-sm font-medium text-slate-700 dark:text-gray-300">
-            Delete "{session.title}"?
+            Delete &quot;{session.title}&quot;?
           </p>
           <div className="flex gap-2">
             <button
