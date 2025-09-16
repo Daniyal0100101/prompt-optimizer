@@ -8,20 +8,19 @@ import {
   useMemo,
 } from "react";
 import {
-  FiCopy,
-  FiCheckCircle,
-  FiRefreshCw,
-  FiSend,
-  FiPlus,
-  FiMessageSquare,
-  FiUser,
-  FiCpu,
-  FiMenu,
-  FiHome,
-  FiSettings,
-} from "react-icons/fi";
+  Copy,
+  CheckCircle,
+  RefreshCw,
+  Send,
+  Plus,
+  MessageSquare,
+  User,
+  Cpu,
+  Menu,
+  Home,
+  Settings,
+} from "lucide-react";
 import { toast } from "react-hot-toast";
-import * as CryptoJS from "crypto-js";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { getSelectedModel, ModelId } from "../utils/modelConfig";
@@ -115,23 +114,13 @@ export default function PromptOptimizer({
       const savedKey = localStorage.getItem("API_KEY");
       if (savedKey) {
         const iv = getIV(SECRET_KEY);
-        const result = decryptSafe(
-          savedKey,
-          SECRET_KEY,
-          iv,
-          CryptoJS.mode.CBC,
-          CryptoJS.pad.Pkcs7
-        );
+        const result = decryptSafe(savedKey, SECRET_KEY, iv);
 
         if (result.ok && result.plaintext) {
           setApiKey(result.plaintext);
           setIsApiKeyValid(true);
         } else {
           console.warn("Failed to decrypt API key");
-          if (!result.ok) {
-            const errorResult = result as { reason?: string };
-            console.warn("Reason:", errorResult.reason || "Unknown error");
-          }
           setIsApiKeyValid(false);
         }
       } else {
@@ -355,7 +344,7 @@ export default function PromptOptimizer({
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 transform hover:scale-105"
             aria-label="New Chat"
           >
-            <FiPlus className="w-3 h-3" />
+            <Plus className="w-3 h-3" />
             New
           </button>
         </div>
@@ -364,14 +353,14 @@ export default function PromptOptimizer({
             href="/"
             className="flex items-center gap-1.5 px-2 py-1 text-xs text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-gray-200 transition-colors duration-200"
           >
-            <FiHome className="w-3 h-3" />
+            <Home className="w-3 h-3" />
             Home
           </Link>
           <Link
             href="/settings"
             className="flex items-center gap-1.5 px-2 py-1 text-xs text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-gray-200 transition-colors duration-200"
           >
-            <FiSettings className="w-3 h-3" />
+            <Settings className="w-3 h-3" />
             Settings
           </Link>
         </div>
@@ -380,7 +369,7 @@ export default function PromptOptimizer({
       <div className="flex-1 overflow-y-auto p-4">
         {sessions.length === 0 ? (
           <EmptyState
-            icon={<FiMessageSquare className="w-6 h-6 text-white" />}
+            icon={<MessageSquare className="w-6 h-6 text-white" />}
             title="No conversations yet"
             description="Start a new optimization to see your chat history here."
             className="mt-8"
@@ -474,7 +463,7 @@ export default function PromptOptimizer({
               onClick={() => setIsHistoryOpen(true)}
               aria-label="Open sidebar"
             >
-              <FiMenu className="w-5 h-5" />
+              <Menu className="w-5 h-5" />
             </button>
             <h1 className="text-lg font-bold text-slate-900 dark:text-gray-100">
               Prompt Optimizer
@@ -485,7 +474,7 @@ export default function PromptOptimizer({
               href="/settings"
               className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-100 dark:bg-amber-900/30 rounded-lg hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-all duration-200"
             >
-              <FiSettings className="w-3 h-3" />
+              <Settings className="w-3 h-3" />
               Setup Required
             </Link>
           )}
@@ -502,7 +491,7 @@ export default function PromptOptimizer({
           ) : messages.length === 0 ? (
             <div className="flex items-center justify-center h-full px-6">
               <EmptyState
-                icon={<FiMessageSquare className="w-8 h-8 text-white" />}
+                icon={<MessageSquare className="w-8 h-8 text-white" />}
                 title="Ready to Optimize"
                 description="Enter a prompt below and let AI transform it into a high-performance instruction."
                 className="max-w-md"
@@ -519,7 +508,7 @@ export default function PromptOptimizer({
                 >
                   {m.role === "assistant" && (
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-md">
-                      <FiCpu className="w-4 h-4 text-white" />
+                      <Cpu className="w-4 h-4 text-white" />
                     </div>
                   )}
                   <div
@@ -539,9 +528,9 @@ export default function PromptOptimizer({
                           className="flex items-center gap-1.5 px-2 py-1 text-xs text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-gray-200 hover:bg-slate-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-200"
                         >
                           {copied[`msg-${i}`] ? (
-                            <FiCheckCircle className="w-3 h-3" />
+                            <CheckCircle className="w-3 h-3" />
                           ) : (
-                            <FiCopy className="w-3 h-3" />
+                            <Copy className="w-3 h-3" />
                           )}
                           {copied[`msg-${i}`] ? "Copied" : "Copy"}
                         </button>
@@ -558,7 +547,7 @@ export default function PromptOptimizer({
                               key={idx}
                               className="flex items-start gap-2 text-xs text-slate-700 dark:text-gray-300"
                             >
-                              <FiCheckCircle className="w-3 h-3 text-green-500 mt-0.5 flex-shrink-0" />
+                              <CheckCircle className="w-3 h-3 text-green-500 mt-0.5 flex-shrink-0" />
                               <span>{ex}</span>
                             </li>
                           ))}
@@ -568,7 +557,7 @@ export default function PromptOptimizer({
                   </div>
                   {m.role === "user" && (
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center flex-shrink-0 shadow-md">
-                      <FiUser className="w-4 h-4 text-white" />
+                      <User className="w-4 h-4 text-white" />
                     </div>
                   )}
                 </div>
@@ -576,7 +565,7 @@ export default function PromptOptimizer({
               {isLoading && (
                 <div className="flex gap-3">
                   <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
-                    <FiCpu className="w-4 h-4 text-white" />
+                    <Cpu className="w-4 h-4 text-white" />
                   </div>
                   <div className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-2xl px-4 py-3">
                     <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-gray-400">
@@ -599,9 +588,9 @@ export default function PromptOptimizer({
                 className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 dark:text-gray-300 bg-slate-100 dark:bg-gray-800 rounded-lg hover:bg-slate-200 dark:hover:bg-gray-700 transition-all duration-200 transform hover:scale-105"
               >
                 {copied["latest"] ? (
-                  <FiCheckCircle className="w-4 h-4" />
+                  <CheckCircle className="w-4 h-4" />
                 ) : (
-                  <FiCopy className="w-4 h-4" />
+                  <Copy className="w-4 h-4" />
                 )}
                 Copy Latest
               </button>
@@ -609,7 +598,7 @@ export default function PromptOptimizer({
                 onClick={startNewOptimization}
                 className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-700 rounded-lg hover:from-blue-700 hover:to-indigo-800 transition-all duration-200 transform hover:scale-105"
               >
-                <FiRefreshCw className="w-4 h-4" />
+                <RefreshCw className="w-4 h-4" />
                 New Chat
               </button>
             </div>
@@ -646,7 +635,7 @@ export default function PromptOptimizer({
                        flex items-center gap-2 font-medium"
               aria-label="Send prompt"
             >
-              <FiSend className="w-4 h-4" />
+              <Send className="w-4 h-4" />
               <span className="hidden sm:inline">Send</span>
             </button>
           </div>

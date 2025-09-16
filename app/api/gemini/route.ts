@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  GoogleGenerativeAI,
-  Content,
-  GenerationConfig,
-  SchemaType,
-} from "@google/generative-ai";
+  GoogleGenAI,
+  type ContentListUnion,
+  type GenerateContentConfig,
+  type GenerateContentResponse,
+  type SchemaUnion,
+} from "@google/genai";
 import { ModelId } from "../../utils/modelConfig";
 import { SUPPORTED_MODELS } from "../../utils/modelConfig";
 
@@ -85,7 +86,7 @@ class ApiError extends Error {
 
 /**
  * Generates content with a retry mechanism for transient errors.
- * @param genAI - The GoogleGenerativeAI instance.
+ * @param genAI - The GoogleGenAI instance.
  * @param model - The model to use for generation.
  * @param contents - The content to send to the model.
  * @param config - The generation configuration.
@@ -94,19 +95,19 @@ class ApiError extends Error {
  * @returns The generated content result.
  */
 async function generateWithRetry(
-  genAI: GoogleGenerativeAI,
+  genAI: GoogleGenAI,
   model: string,
-  contents: Content[],
-  config: GenerationConfig,
+  contents: ContentListUnion,
+  config: GenerateContentConfig,
   retries = 3,
   delay = 800
-) {
+): Promise<GenerateContentResponse> {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      const generativeModel = genAI.getGenerativeModel({ model });
-      return await generativeModel.generateContent({
+      return await genAI.models.generateContent({
+        model,
         contents,
-        generationConfig: config,
+        config,
       });
     } catch (err: unknown) {
       const error = err as { status?: number; message?: string };
@@ -241,7 +242,7 @@ export async function POST(
       );
     }
 
-    const genAI = new GoogleGenerativeAI(apiKey);
+    const genAI = new GoogleGenAI({ apiKey });
     const supportsSchema = /1\.5|2\./.test(resolvedModel);
 
     const fullPrompt = buildFullPrompt(
@@ -249,27 +250,25 @@ export async function POST(
       previousPrompt,
       refinementInstruction
     );
-    const contents: Content[] = [
-      { role: "user", parts: [{ text: fullPrompt }] },
-    ];
+    const contents: ContentListUnion = fullPrompt;
 
-    const config: GenerationConfig = {
+    const config: GenerateContentConfig = {
       // Default to JSON output
       responseMimeType: "application/json",
     };
 
     if (supportsSchema) {
       config.responseSchema = {
-        type: SchemaType.OBJECT,
+        type: "object",
         properties: {
-          optimizedPrompt: { type: SchemaType.STRING },
+          optimizedPrompt: { type: "string" },
           explanations: {
-            type: SchemaType.ARRAY,
-            items: { type: SchemaType.STRING },
+            type: "array",
+            items: { type: "string" },
           },
         },
         required: ["optimizedPrompt", "explanations"],
-      };
+      } as SchemaUnion;
     }
 
     const result = await generateWithRetry(
@@ -279,7 +278,7 @@ export async function POST(
       config
     );
 
-    const responseText = result.response.text();
+    const responseText = result.text as string | undefined;
     const parsedData = parseResponse(responseText);
 
     return NextResponse.json(parsedData);

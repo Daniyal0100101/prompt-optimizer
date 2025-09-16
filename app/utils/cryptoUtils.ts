@@ -4,6 +4,25 @@ type DecryptResult =
   | { ok: true; plaintext: string }
   | { ok: false; reason: string };
 
+export const encryptSafe = (
+  plaintext: string,
+  secret: string,
+  iv?: string,
+  mode: typeof CryptoJS.mode.CBC = CryptoJS.mode.CBC,
+  padding: typeof CryptoJS.pad.Pkcs7 = CryptoJS.pad.Pkcs7
+): string => {
+  const options: {
+    mode: typeof mode;
+    padding: typeof padding;
+    iv?: CryptoJS.lib.WordArray;
+  } = { mode, padding };
+  if (iv) {
+    options.iv = CryptoJS.enc.Utf8.parse(iv);
+  }
+  const encrypted = CryptoJS.AES.encrypt(plaintext, secret, options);
+  return encrypted.toString();
+};
+
 // Derive a 16-byte IV from a secret using SHA-256 (first 16 chars)
 export const getIV = (secret: string): string => {
   return CryptoJS.SHA256(secret).toString().substring(0, 16);

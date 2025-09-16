@@ -1,7 +1,7 @@
 import { useState, useEffect, ChangeEvent } from "react";
-import { FiKey, FiCheck, FiAlertCircle, FiChevronDown } from "react-icons/fi";
+import { Key, Check, AlertCircle, ChevronDown } from "lucide-react";
 import toast from "react-hot-toast";
-import * as CryptoJS from "crypto-js";
+
 import {
   SUPPORTED_MODELS,
   getSelectedModel,
@@ -9,7 +9,7 @@ import {
   ModelId,
 } from "../utils/modelConfig";
 import { SECRET_KEY } from "../utils/config";
-import { decryptSafe } from "../utils/cryptoUtils";
+import { decryptSafe, encryptSafe, getIV } from "../utils/cryptoUtils";
 
 interface ApiKeyInputProps {
   onKeyVerified: (isVerified: boolean) => void;
@@ -32,12 +32,6 @@ export default function ApiKeyInput({
   );
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
 
-  // Generate a consistent IV based on the secret key
-  const getIV = (key: string) => {
-    // Use the first 16 bytes of the SHA256 hash of the key as IV
-    return CryptoJS.SHA256(key).toString().substring(0, 16);
-  };
-
   useEffect(() => {
     const loadSavedKey = () => {
       // Only run on client side
@@ -50,13 +44,7 @@ export default function ApiKeyInput({
         // First try to decrypt with the current key
         try {
           const iv = getIV(SECRET_KEY);
-          const result = decryptSafe(
-            savedKey,
-            SECRET_KEY,
-            iv,
-            CryptoJS.mode.CBC,
-            CryptoJS.pad.Pkcs7
-          );
+          const result = decryptSafe(savedKey, SECRET_KEY, iv);
 
           // If decryption succeeds and there's a plaintext, trust the stored key without re-validating.
           // Validation is enforced when the user first saves the key.
@@ -80,26 +68,13 @@ export default function ApiKeyInput({
         if (SECRET_KEY !== FALLBACK_KEY) {
           try {
             const iv = getIV(FALLBACK_KEY);
-            const result = decryptSafe(
-              savedKey,
-              FALLBACK_KEY,
-              iv,
-              CryptoJS.mode.CBC,
-              CryptoJS.pad.Pkcs7
-            );
+            const result = decryptSafe(savedKey, FALLBACK_KEY, iv);
 
             if (result.ok && result.plaintext) {
               // Re-encrypt with the new key for next time
               const newIv = getIV(SECRET_KEY);
-              const encrypted = CryptoJS.AES.encrypt(
-                result.plaintext,
-                SECRET_KEY,
-                {
-                  iv: CryptoJS.enc.Utf8.parse(newIv),
-                  mode: CryptoJS.mode.CBC,
-                  padding: CryptoJS.pad.Pkcs7,
-                }
-              );
+              const encrypted = encryptSafe(result.plaintext, SECRET_KEY, newIv);
+
               localStorage.setItem("API_KEY", encrypted.toString());
 
               setApiKey(result.plaintext);
@@ -159,11 +134,7 @@ export default function ApiKeyInput({
 
     try {
       const iv = getIV(SECRET_KEY);
-      const encrypted = CryptoJS.AES.encrypt(apiKey, SECRET_KEY, {
-        iv: CryptoJS.enc.Utf8.parse(iv),
-        mode: CryptoJS.mode.CBC,
-        padding: CryptoJS.pad.Pkcs7,
-      });
+      const encrypted = encryptSafe(apiKey, SECRET_KEY, iv);
 
       localStorage.setItem("API_KEY", encrypted.toString());
       setIsValid(true);
@@ -202,7 +173,7 @@ export default function ApiKeyInput({
     >
       {showTitle && (
         <div className="flex items-center mb-4">
-          <FiKey className="text-blue-600 dark:text-blue-400 mr-2" />
+          <Key className="text-blue-600 dark:text-blue-400 mr-2" />
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
             Gemini API Key & Model
           </h2>
@@ -226,7 +197,7 @@ export default function ApiKeyInput({
             aria-expanded={isModelDropdownOpen}
           >
             <span>{currentModel?.name || "Select a model"}</span>
-            <FiChevronDown
+            <ChevronDown
               className={`transition-transform text-gray-500 dark:text-gray-400 ${
                 isModelDropdownOpen ? "transform rotate-180" : ""
               }`}
@@ -293,14 +264,14 @@ export default function ApiKeyInput({
         >
           {isValid === true && (
             <div className="w-5 h-5 rounded-full bg-green-100 dark:bg-green-900/50 flex items-center justify-center">
-              <FiCheck
+              <Check
                 className="w-3.5 h-3.5 text-green-600 dark:text-green-400"
                 aria-label="API key is valid"
               />
             </div>
           )}
           {isValid === false && (
-            <FiAlertCircle
+            <AlertCircle
               className="w-4 h-4 text-red-500"
               aria-label="API key is invalid"
             />
@@ -309,7 +280,7 @@ export default function ApiKeyInput({
       </div>
 
       <div className="mt-3 text-sm text-gray-500 dark:text-gray-400 flex items-start">
-        <FiAlertCircle className="mr-1.5 mt-0.5 flex-shrink-0" />
+        <AlertCircle className="mr-1.5 mt-0.5 flex-shrink-0" />
         <span>
           {isSaved
             ? "API key is saved. You can now use the app."
@@ -338,7 +309,7 @@ export default function ApiKeyInput({
         ) : (
           <div className="flex-1 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-3 py-2 rounded-lg">
-              <FiCheck className="w-4 h-4 flex-shrink-0" />
+              <Check className="w-4 h-4 flex-shrink-0" />
               <span className="text-sm font-medium">API Key Saved</span>
             </div>
             <button
@@ -346,7 +317,7 @@ export default function ApiKeyInput({
               className="flex items-center justify-center gap-2 py-2 px-4 rounded-lg font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 transition-all focus:outline-none focus:ring-2 focus:ring-amber-400/20"
               title="Change API key"
             >
-              <FiKey className="w-4 h-4" />
+              <Key className="w-4 h-4" />
               <span>Change</span>
             </button>
           </div>

@@ -5,17 +5,17 @@ import ApiKeyInput from "../components/ApiKeyInput";
 import { useRouter } from "next/navigation";
 import { useTheme, ThemeMode } from "../components/ThemeProvider";
 import {
-  FiSun,
-  FiMoon,
-  FiMonitor,
-  FiCheck,
-  FiKey,
-  FiDroplet,
-  FiArrowLeft,
-  FiZap,
-  FiInfo,
-  FiExternalLink,
-} from "react-icons/fi";
+  Sun,
+  Moon,
+  Monitor,
+  Check,
+  Key,
+  Droplet,
+  ArrowLeft,
+  Zap,
+  Info,
+  ExternalLink,
+} from "lucide-react";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -60,19 +60,19 @@ export default function SettingsPage() {
     {
       value: "system" as ThemeMode,
       label: "System",
-      icon: FiMonitor,
+      icon: Monitor,
       description: "Follow system preference",
     },
     {
       value: "light" as ThemeMode,
       label: "Light",
-      icon: FiSun,
+      icon: Sun,
       description: "Always use light mode",
     },
     {
       value: "dark" as ThemeMode,
       label: "Dark",
-      icon: FiMoon,
+      icon: Moon,
       description: "Always use dark mode",
     },
   ];
@@ -126,7 +126,7 @@ export default function SettingsPage() {
                        hover:text-slate-900 dark:hover:text-gray-100"
               aria-label="Go back"
             >
-              <FiArrowLeft className="w-5 h-5" />
+              <ArrowLeft className="w-5 h-5" />
             </button>
             <div>
               <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-gray-100">
@@ -155,9 +155,9 @@ export default function SettingsPage() {
                 }`}
               >
                 {hasApiKey ? (
-                  <FiCheck className="w-4 h-4 text-green-600 dark:text-green-400" />
+                  <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
                 ) : (
-                  <FiInfo className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                  <Info className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                 )}
               </div>
               <div>
@@ -190,7 +190,7 @@ export default function SettingsPage() {
             <div className="px-6 py-5 border-b border-slate-200 dark:border-gray-800">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-xl bg-blue-100 dark:bg-blue-900/30">
-                  <FiKey className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  <Key className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div>
                   <h2 className="text-lg font-semibold text-slate-900 dark:text-gray-100">
@@ -242,7 +242,7 @@ export default function SettingsPage() {
               <div className="p-4 bg-blue-50/80 dark:bg-blue-950/30 rounded-xl border border-blue-100 dark:border-blue-900/50 shadow-sm">
                 <div className="flex gap-3">
                   <div className="p-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/50 flex-shrink-0 h-fit">
-                    <FiInfo className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                    <Info className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                   </div>
                   <div className="text-sm">
                     <p className="font-medium text-blue-900 dark:text-blue-100 mb-1">
@@ -259,7 +259,7 @@ export default function SettingsPage() {
                       className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-700 dark:text-blue-300 hover:text-blue-800 dark:hover:text-blue-200 transition-colors px-3 py-1.5 bg-white dark:bg-blue-900/40 rounded-lg border border-blue-200 dark:border-blue-800/50 hover:shadow-sm"
                     >
                       Get API Key
-                      <FiExternalLink className="w-3 h-3" />
+                      <ExternalLink className="w-3 h-3" />
                     </a>
                   </div>
                 </div>
@@ -272,7 +272,7 @@ export default function SettingsPage() {
             <div className="px-6 py-5 border-b border-slate-200 dark:border-gray-800">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-xl bg-purple-100 dark:bg-purple-900/30">
-                  <FiDroplet className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                  <Droplet className="w-5 h-5 text-purple-600 dark:text-purple-400" />
                 </div>
                 <div>
                   <h2 className="text-lg font-semibold text-slate-900 dark:text-gray-100">
@@ -327,7 +327,7 @@ export default function SettingsPage() {
                             </span>
                             {isSelected && (
                               <div className="p-1 bg-blue-500 rounded-full">
-                                <FiCheck className="w-3 h-3 text-white" />
+                                <Check className="w-3 h-3 text-white" />
                               </div>
                             )}
                           </div>
@@ -373,7 +373,7 @@ export default function SettingsPage() {
                            : "text-slate-400 dark:text-gray-600 bg-slate-100 dark:bg-gray-800 cursor-not-allowed border border-slate-200 dark:border-gray-700"
                        }`}
             >
-              <FiZap className="w-4 h-4" />
+              <Zap className="w-4 h-4" />
               {hasApiKey ? "Start Optimizing" : "Add API Key First"}
             </button>
           </div>

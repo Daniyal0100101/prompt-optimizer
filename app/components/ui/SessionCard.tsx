@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { FiEdit2, FiTrash2, FiClock } from "react-icons/fi";
+import { Pencil, Trash2, Clock } from "lucide-react";
 
 interface Session {
   id: string;
@@ -141,7 +141,7 @@ const SessionCard = ({
           {session.title || "Untitled Session"}
         </h3>
         <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-gray-500">
-          <FiClock className="w-3 h-3" />
+          <Clock className="w-3 h-3" />
           <span className="font-medium">{formatTime(session.updatedAt)}</span>
         </div>
       </Link>
@@ -161,7 +161,7 @@ const SessionCard = ({
                    transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/50 shadow-sm"
           aria-label="Rename session"
         >
-          <FiEdit2 className="w-3 h-3 text-slate-600 dark:text-gray-400" />
+          <Pencil className="w-3 h-3 text-slate-600 dark:text-gray-400" />
         </button>
         <button
           onClick={(e) => {
@@ -173,7 +173,7 @@ const SessionCard = ({
                    text-red-600 dark:text-red-400 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500/50 shadow-sm"
           aria-label="Delete session"
         >
-          <FiTrash2 className="w-3 h-3" />
+          <Trash2 className="w-3 h-3" />
         </button>
       </div>
     </div>

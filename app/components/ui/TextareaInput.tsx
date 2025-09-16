@@ -1,7 +1,7 @@
 "use client";
 
 import { forwardRef, useState, useEffect } from "react";
-import { FiSend } from "react-icons/fi";
+import { Send } from "lucide-react";
 
 interface TextareaInputProps {
   value: string;
@@ -120,7 +120,7 @@ const TextareaInput = forwardRef<HTMLTextAreaElement, TextareaInputProps>(
                       aria-hidden="true"
                     />
                   ) : (
-                    <FiSend className="w-5 h-5" aria-hidden="true" />
+                    <Send className="w-5 h-5" aria-hidden="true" />
                   )}
                 </button>
               </div>

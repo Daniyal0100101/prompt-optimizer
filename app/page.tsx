@@ -2,10 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useState, useRef, useCallback, FormEvent } from "react";
-import { FiSettings, FiClock, FiGrid, FiList, FiPlus } from "react-icons/fi";
-import { HiOutlineSparkles } from "react-icons/hi2";
+import { Settings, Clock, Grid, List, Plus, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
-import * as CryptoJS from "crypto-js";
 import { toast } from "react-hot-toast";
 import { decryptSafe, getIV } from "./utils/cryptoUtils";
 import { SECRET_KEY } from "./utils/config";
@@ -60,13 +58,7 @@ export default function Home() {
       const savedKey = localStorage.getItem("API_KEY");
       if (savedKey) {
         const iv = getIV(SECRET_KEY);
-        const result = decryptSafe(
-          savedKey,
-          SECRET_KEY,
-          iv,
-          CryptoJS.mode.CBC,
-          CryptoJS.pad.Pkcs7
-        );
+        const result = decryptSafe(savedKey, SECRET_KEY, iv);
 
         if (result.ok && result.plaintext) {
           setHasKey(true);
@@ -147,13 +139,7 @@ export default function Home() {
       }
 
       const iv = getIV(SECRET_KEY);
-      const result = decryptSafe(
-        savedKey,
-        SECRET_KEY,
-        iv,
-        CryptoJS.mode.CBC,
-        CryptoJS.pad.Pkcs7
-      );
+      const result = decryptSafe(savedKey, SECRET_KEY, iv);
 
       if (!result.ok || !result.plaintext) {
         console.error("Failed to decrypt API key:", result);
@@ -240,7 +226,7 @@ export default function Home() {
               className="inline-flex items-center gap-2 px-4 py-2 mb-6 text-sm font-semibold text-blue-700 bg-gradient-to-r from-blue-100/90 to-indigo-100/90 rounded-full backdrop-blur-sm dark:from-blue-900/40 dark:to-indigo-900/40 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/60 shadow-lg"
               style={{ userSelect: "none" }}
             >
-              <HiOutlineSparkles className="w-4 h-4 animate-pulse" />
+              <Sparkles className="w-4 h-4 animate-pulse" />
               AI-Powered Optimization
             </div>
 
@@ -300,7 +286,7 @@ export default function Home() {
             <div className="mt-6 text-center">
               <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 rounded-2xl p-6 border border-amber-200/50 dark:border-amber-800/50">
                 <div className="w-12 h-12 bg-gradient-to-r from-amber-500 to-orange-500 rounded-xl flex items-center justify-center mx-auto mb-4">
-                  <FiSettings className="w-6 h-6 text-white" />
+                  <Settings className="w-6 h-6 text-white" />
                 </div>
                 <h3 className="text-lg font-semibold text-slate-800 dark:text-gray-200 mb-2">
                   Get Started
@@ -313,7 +299,7 @@ export default function Home() {
                   className="inline-flex items-center gap-2 px-6 py-3 text-sm font-medium text-white bg-gradient-to-r from-amber-500 to-orange-600 rounded-xl
                            hover:from-amber-600 hover:to-orange-700 transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-amber-500/50 shadow-lg"
                 >
-                  <FiSettings className="w-4 h-4" />
+                  <Settings className="w-4 h-4" />
                   Setup API Key
                 </Link>
               </div>
@@ -325,7 +311,7 @@ export default function Home() {
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-gray-100 flex items-center gap-2">
-                <FiClock className="w-5 h-5 text-slate-500" />
+                <Clock className="w-5 h-5 text-slate-500" />
                 Recent Optimizations
               </h2>
 
@@ -347,9 +333,9 @@ export default function Home() {
                   aria-label="Toggle view mode"
                 >
                   {viewMode === "grid" ? (
-                    <FiList className="w-4 h-4" />
+                    <List className="w-4 h-4" />
                   ) : (
-                    <FiGrid className="w-4 h-4" />
+                    <Grid className="w-4 h-4" />
                   )}
                 </button>
               </div>
@@ -357,7 +343,7 @@ export default function Home() {
 
             {filteredSessions.length === 0 ? (
               <EmptyState
-                icon={<FiClock className="w-8 h-8 text-white" />}
+                icon={<Clock className="w-8 h-8 text-white" />}
                 title={
                   searchFilter ? "No matching sessions" : "No optimizations yet"
                 }
@@ -407,7 +393,7 @@ export default function Home() {
 
         {sessions.length === 0 && (
           <EmptyState
-            icon={<HiOutlineSparkles className="w-8 h-8 text-white" />}
+            icon={<Sparkles className="w-8 h-8 text-white" />}
             title="Ready to optimize your prompts?"
             description="Enter any prompt above and watch our AI transform it into a high-performance instruction."
             action={
@@ -417,7 +403,7 @@ export default function Home() {
                   className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl
                            hover:from-blue-600 hover:to-indigo-700 transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 >
-                  <FiPlus className="w-4 h-4" />
+                  <Plus className="w-4 h-4" />
                   Start Optimizing
                 </button>
               ) : (
@@ -426,7 +412,7 @@ export default function Home() {
                   className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-amber-500 to-orange-600 rounded-xl
                            hover:from-amber-600 hover:to-orange-700 transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
                 >
-                  <FiSettings className="w-4 h-4" />
+                  <Settings className="w-4 h-4" />
                   Setup API Key
                 </Link>
               )
