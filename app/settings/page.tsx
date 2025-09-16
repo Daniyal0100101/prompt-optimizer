@@ -98,8 +98,8 @@ export default function SettingsPage() {
 
   if (!mounted || isLoading) {
     return (
-      <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30 dark:from-gray-950 dark:via-gray-900 dark:to-blue-950/20">
-        <div className="flex min-h-screen items-center justify-center">
+      <main className="min-h-[100svh] sm:min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30 dark:from-gray-950 dark:via-gray-900 dark:to-blue-950/20">
+        <div className="flex min-h-[100svh] sm:min-h-screen items-center justify-center pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
           <div className="flex items-center gap-3 text-slate-600 dark:text-gray-400">
             <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
             Loading settings...
@@ -114,25 +114,25 @@ export default function SettingsPage() {
     modelInfo["gemini-2.5-flash"];
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30 dark:from-gray-950 dark:via-gray-900 dark:to-blue-950/20">
-      <div className="container mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 max-w-4xl">
-        <div className="space-y-4 sm:space-y-6">
+    <main className="min-h-[100svh] sm:min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30 dark:from-gray-950 dark:via-gray-900 dark:to-blue-950/20">
+      <div className="container mx-auto px-3 sm:px-6 lg:px-8 py-6 md:py-8 max-w-4xl">
+        <div className="space-y-6">
           {/* Header with Back Button */}
-          <div className="flex items-center gap-3 sm:gap-4 mb-2">
+          <div className="flex items-center gap-4 mb-2">
             <button
               onClick={() => router.push("/")}
               className="p-2 rounded-xl bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-800 
                        hover:bg-slate-50 dark:hover:bg-gray-800 transition-colors text-slate-600 dark:text-gray-400
-                       hover:text-slate-900 dark:hover:text-gray-100 min-h-[44px] min-w-[44px] touch-manipulation"
+                       hover:text-slate-900 dark:hover:text-gray-100"
               aria-label="Go back"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
-            <div className="flex-1 min-w-0">
-              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-900 dark:text-gray-100 truncate">
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-gray-100">
                 Settings
               </h1>
-              <p className="text-xs sm:text-sm text-slate-600 dark:text-gray-400 mt-1">
+              <p className="text-sm text-slate-600 dark:text-gray-400 mt-1">
                 Configure your API key, model preferences, and theme
               </p>
             </div>
@@ -187,16 +187,16 @@ export default function SettingsPage() {
 
           {/* API Configuration Section */}
           <section className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-slate-200 dark:border-gray-800 overflow-hidden">
-            <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-slate-200 dark:border-gray-800">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="p-1.5 sm:p-2 rounded-xl bg-blue-100 dark:bg-blue-900/30">
-                  <Key className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 dark:text-blue-400" />
+            <div className="px-6 py-5 border-b border-slate-200 dark:border-gray-800">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-blue-100 dark:bg-blue-900/30">
+                  <Key className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-gray-100">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900 dark:text-gray-100">
                     API Configuration
                   </h2>
-                  <p className="text-xs sm:text-sm text-slate-600 dark:text-gray-400">
+                  <p className="text-sm text-slate-600 dark:text-gray-400">
                     Set up your Gemini API key and choose your preferred model
                   </p>
                 </div>

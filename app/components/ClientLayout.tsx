@@ -32,12 +32,14 @@ function ThemedLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className={`min-h-screen flex flex-col ${effectiveTheme}`}>
+    <div
+      className={`min-h-[100svh] sm:min-h-screen flex flex-col ${effectiveTheme} pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]`}
+    >
       <SkipToContentLink />
       <Header />
       <main
         id="main"
-        className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-8"
+        className="flex-grow min-h-0 container mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8"
       >
         {children}
       </main>

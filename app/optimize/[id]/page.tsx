@@ -3,7 +3,6 @@
 import PromptOptimizer from "../../components/PromptOptimizer";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import * as CryptoJS from "crypto-js";
 import { decryptSafe, getIV } from "../../utils/cryptoUtils";
 import { SECRET_KEY } from "../../utils/config";
 
@@ -28,13 +27,7 @@ export default function OptimizeSessionPage() {
 
       try {
         const iv = SECRET_KEY ? getIV(SECRET_KEY) : undefined;
-        const result = decryptSafe(
-          saved,
-          SECRET_KEY,
-          iv,
-          CryptoJS.mode.CBC,
-          CryptoJS.pad.Pkcs7
-        );
+        const result = decryptSafe(saved, SECRET_KEY, iv);
 
         if (!result.ok || !result.plaintext) {
           console.warn("Failed to decrypt API key");
@@ -57,7 +50,7 @@ export default function OptimizeSessionPage() {
   // Show loading state until client-side check is complete
   if (!isClient) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-[100svh] sm:min-h-screen flex items-center justify-center pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
         <div className="flex items-center gap-2 text-slate-500 dark:text-gray-400">
           <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
           <span>Loading...</span>
@@ -67,7 +60,7 @@ export default function OptimizeSessionPage() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center p-4 md:p-8">
+    <main className="flex min-h-[100svh] sm:min-h-screen flex-col items-center p-3 sm:p-4 md:p-8 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
       <div className="w-full max-w-6xl">
         <PromptOptimizer />
       </div>

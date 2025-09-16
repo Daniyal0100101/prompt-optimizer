@@ -40,7 +40,7 @@ export default function RootLayout({
       </head>
       <body
         suppressHydrationWarning
-        className={`${inter.variable} font-sans bg-gradient-to-br from-slate-50 via-white to-cyan-50/30 dark:from-gray-950 dark:via-gray-900 dark:to-cyan-950/20 text-slate-900 dark:text-gray-100 transition-colors min-h-screen`}
+        className={`${inter.variable} font-sans bg-gradient-to-br from-slate-50 via-white to-cyan-50/30 dark:from-gray-950 dark:via-gray-900 dark:to-cyan-950/20 text-slate-900 dark:text-gray-100 transition-colors min-h-[100svh] sm:min-h-screen`}
       >
         <ClientLayout>{children}</ClientLayout>
         <SpeedInsights />

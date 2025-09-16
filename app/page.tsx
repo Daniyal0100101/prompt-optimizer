@@ -217,40 +217,38 @@ export default function Home() {
   ];
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30 dark:from-gray-950 dark:via-gray-900 dark:to-blue-950/20">
-      <div className="container mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 max-w-4xl">
-        <header className="text-center mb-8 sm:mb-10 lg:mb-12">
+    <main className="min-h-[100svh] sm:min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30 dark:from-gray-950 dark:via-gray-900 dark:to-blue-950/20">
+      <div className="container mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-8 max-w-4xl">
+        <header className="text-center mb-8 sm:mb-12">
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-r from-blue-400/20 via-purple-400/20 to-indigo-400/20 blur-3xl -z-10" />
             <div
-              className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 mb-4 sm:mb-6 text-xs sm:text-sm font-semibold text-blue-700 bg-gradient-to-r from-blue-100/90 to-indigo-100/90 rounded-full backdrop-blur-sm dark:from-blue-900/40 dark:to-indigo-900/40 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/60 shadow-lg"
+              className="inline-flex items-center gap-2 px-4 py-2 mb-6 text-sm font-semibold text-blue-700 bg-gradient-to-r from-blue-100/90 to-indigo-100/90 rounded-full backdrop-blur-sm dark:from-blue-900/40 dark:to-indigo-900/40 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/60 shadow-lg"
               style={{ userSelect: "none" }}
             >
-              <Sparkles className="w-3 sm:w-4 h-3 sm:h-4 animate-pulse" />
-              <span className="hidden xs:inline">AI-Powered Optimization</span>
-              <span className="xs:hidden">AI Optimization</span>
+              <Sparkles className="w-4 h-4 animate-pulse" />
+              AI-Powered Optimization
             </div>
 
-            <h1 className="text-3xl xs:text-4xl sm:text-5xl md:text-6xl font-black gradient-text tracking-tight mb-3 sm:mb-4 leading-tight px-2">
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-black gradient-text tracking-tight mb-4 leading-tight">
               Prompt Optimizer
             </h1>
 
-            <p className="text-sm sm:text-base md:text-lg text-slate-600 dark:text-gray-400 max-w-2xl mx-auto leading-relaxed px-4 sm:px-0">
+            <p className="text-base md:text-lg text-slate-600 dark:text-gray-400 max-w-2xl mx-auto leading-relaxed">
               Transform your ideas into high-performance instructions with
               AI-driven optimization. Get better results with smarter prompts.
             </p>
           </div>
         </header>
 
-        <form onSubmit={handleStartFromHome} className="relative mb-8 sm:mb-10 lg:mb-12">
+        <form onSubmit={handleStartFromHome} className="relative mb-12">
           {!hasKey && (
-            <div className="absolute -top-2 sm:-top-3 left-3 sm:left-6 z-30 px-2 sm:px-3 py-1 sm:py-1.5 bg-gradient-to-r from-amber-500/95 to-orange-500/95 dark:from-amber-600/95 dark:to-orange-600/95 text-white text-xs font-semibold rounded-full shadow-lg backdrop-blur-sm border border-white/20">
-              <span className="relative flex h-1.5 w-1.5 sm:h-2 sm:w-2 mr-1.5 sm:mr-2 inline-block">
+            <div className="absolute -top-3 left-6 z-30 px-3 py-1.5 bg-gradient-to-r from-amber-500/95 to-orange-500/95 dark:from-amber-600/95 dark:to-orange-600/95 text-white text-xs font-semibold rounded-full shadow-lg backdrop-blur-sm border border-white/20">
+              <span className="relative flex h-2 w-2 mr-2 inline-block">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white/80"></span>
-                <span className="relative inline-flex rounded-full h-1.5 w-1.5 sm:h-2 sm:w-2 bg-white"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
               </span>
-              <span className="hidden xs:inline">API Key Required</span>
-              <span className="xs:hidden">Setup Required</span>
+              API Key Required
             </div>
           )}
 
@@ -271,12 +269,12 @@ export default function Home() {
           />
 
           {!homeInput && hasKey && (
-            <div className="mt-6 sm:mt-8">
-              <div className="text-center mb-3 sm:mb-4 px-4">
-                <h3 className="text-sm sm:text-base font-semibold text-slate-700 dark:text-gray-300 mb-1 sm:mb-2">
+            <div className="mt-8">
+              <div className="text-center mb-4">
+                <h3 className="text-sm font-semibold text-slate-700 dark:text-gray-300 mb-2">
                   Try these popular prompts
                 </h3>
-                <p className="text-xs sm:text-sm text-slate-500 dark:text-gray-500">
+                <p className="text-xs text-slate-500 dark:text-gray-500">
                   Click any suggestion to get started quickly
                 </p>
               </div>
@@ -285,23 +283,23 @@ export default function Home() {
           )}
 
           {!hasKey && (
-            <div className="mt-4 sm:mt-6 text-center">
-              <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 rounded-2xl p-4 sm:p-6 border border-amber-200/50 dark:border-amber-800/50">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r from-amber-500 to-orange-500 rounded-xl flex items-center justify-center mx-auto mb-3 sm:mb-4">
-                  <Settings className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+            <div className="mt-6 text-center">
+              <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 rounded-2xl p-6 border border-amber-200/50 dark:border-amber-800/50">
+                <div className="w-12 h-12 bg-gradient-to-r from-amber-500 to-orange-500 rounded-xl flex items-center justify-center mx-auto mb-4">
+                  <Settings className="w-6 h-6 text-white" />
                 </div>
-                <h3 className="text-base sm:text-lg font-semibold text-slate-800 dark:text-gray-200 mb-2">
+                <h3 className="text-lg font-semibold text-slate-800 dark:text-gray-200 mb-2">
                   Get Started
                 </h3>
-                <p className="text-xs sm:text-sm text-slate-600 dark:text-gray-400 mb-3 sm:mb-4 max-w-sm mx-auto px-2">
+                <p className="text-sm text-slate-600 dark:text-gray-400 mb-4 max-w-sm mx-auto">
                   Add your API key to start optimizing prompts with AI
                 </p>
                 <Link
                   href="/settings"
-                  className="inline-flex items-center gap-1.5 sm:gap-2 px-4 sm:px-6 py-2.5 sm:py-3 text-xs sm:text-sm font-medium text-white bg-gradient-to-r from-amber-500 to-orange-600 rounded-xl
+                  className="inline-flex items-center gap-2 px-6 py-3 text-sm font-medium text-white bg-gradient-to-r from-amber-500 to-orange-600 rounded-xl
                            hover:from-amber-600 hover:to-orange-700 transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-amber-500/50 shadow-lg"
                 >
-                  <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <Settings className="w-4 h-4" />
                   Setup API Key
                 </Link>
               </div>
@@ -310,28 +308,27 @@ export default function Home() {
         </form>
 
         {sessions.length > 0 && (
-          <div className="space-y-4 sm:space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-              <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-gray-100 flex items-center gap-2">
-                <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-slate-500" />
-                <span className="hidden xs:inline">Recent Optimizations</span>
-                <span className="xs:hidden">Recent</span>
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-gray-100 flex items-center gap-2">
+                <Clock className="w-5 h-5 text-slate-500" />
+                Recent Optimizations
               </h2>
 
-              <div className="flex items-center gap-2 sm:gap-3">
+              <div className="flex items-center gap-3">
                 <input
                   type="text"
                   placeholder="Search..."
                   value={searchFilter}
                   onChange={(e) => setSearchFilter(e.target.value)}
-                  className="px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-xl bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700
+                  className="px-3 py-2 text-sm rounded-xl bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700
                            focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
-                           placeholder:text-slate-400 dark:placeholder:text-gray-500 w-24 xs:w-32 sm:w-40"
+                           placeholder:text-slate-400 dark:placeholder:text-gray-500 w-32 sm:w-40"
                 />
 
                 <button
                   onClick={toggleViewMode}
-                  className="p-1.5 sm:p-2 rounded-xl bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700
+                  className="p-2 rounded-xl bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700
                            hover:bg-slate-50 dark:hover:bg-gray-750 transition-colors text-slate-600 dark:text-gray-400"
                   aria-label="Toggle view mode"
                 >
