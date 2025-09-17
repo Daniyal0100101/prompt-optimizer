@@ -173,6 +173,7 @@ export default function Home() {
           role: "assistant",
           content: data.optimizedPrompt || "",
           explanations: data.explanations || [],
+          suggestions: data.suggestions || [],
         },
       ];
 

@@ -17,6 +17,39 @@ interface ApiRequestBody {
   apiKey: string;
   previousPrompt?: string;
   refinementInstruction?: string;
+  // New flow controls
+  task?: "optimize" | "clarify" | "refine";
+  selectedSuggestion?: string;
+  previousOptimizedPrompt?: string;
+  answers?: Array<{ question: string; answer: string }>;
+}
+
+/**
+ * Cleans and constrains suggestions for reliability in the UI.
+ */
+function sanitizeSuggestions(suggestions?: string[]): string[] {
+  if (!Array.isArray(suggestions)) return [];
+  const cleaned: string[] = [];
+  const seen = new Set<string>();
+  for (const s of suggestions) {
+    if (typeof s !== "string") continue;
+    let t = s.trim();
+    // Remove leading prefixes like 'Ask the user:' or quotes
+    t = t.replace(/^"+|"+$/g, "");
+    t = t.replace(/^\s*(ask the user:|ask:|question:|prompt:)/i, "").trim();
+    if (!t) continue;
+    // Normalize spaces
+    t = t.replace(/\s+/g, " ");
+    // Enforce max of ~12 words to keep chips short
+    const words = t.split(" ");
+    if (words.length > 12) t = words.slice(0, 12).join(" ");
+    const key = t.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    cleaned.push(t);
+    if (cleaned.length >= 3) break;
+  }
+  return cleaned;
 }
 
 /**
@@ -57,6 +90,11 @@ interface ApiResponseError {
 interface ApiResponseSuccess {
   optimizedPrompt: string;
   explanations: string[];
+  suggestions?: string[];
+}
+
+interface ApiResponseClarify {
+  questions: string[];
 }
 
 // --- Helper Functions ---
@@ -149,27 +187,130 @@ function buildFullPrompt(
 ): string {
   if (refinementInstruction && previousPrompt) {
     return `
-      You are a prompt engineering expert specializing in iterative refinement for large language models.
-      Existing prompt: "${previousPrompt}"
-      User feedback: "${refinementInstruction}"
+      You are a prompt engineering expert who specializes in iterative refinement for large language models.
+      
+      Existing prompt: "${previousPrompt}".
+      User feedback: "${refinementInstruction}".
 
-      Refine the prompt by analyzing the feedback and making targeted, meaningful changes. Do not append the instruction verbatim—integrate it thoughtfully. Ensure clarity, specificity, and effectiveness.
+      Refine the prompt, considering the feedback, by making targeted, meaningful changes. 
+      Analyze the feedback and integrate it thoughtfully into the prompt. Ensure clarity, specificity, and effectiveness. 
+      Avoid appending the instruction verbatim and instead focus on integrating it in a way that enhances the prompt.
+
+      Preserve the user's original tone, keywords, terminology, and language unless explicitly asked to change them. 
+      If you change a key term, keep it minimal and justify briefly in explanations.
+
+      Quality Checklist (apply silently):
+      - Clarity and specificity
+      - Audience fit
+      - Platform/length constraints enforced (if applicable)
+      - Structure/output format appropriate
+      - Avoid boilerplate
+      - Maintain user language
+
+      Suggestions Guidelines:
+      - Provide 2–3 concise next-step suggestion phrases (<=12 words each)
+      - Do not use quotes or prefixes like 'Ask the user:'
+      - Use imperative mood, e.g. 'Quantify benefits'
+      - Do not repeat suggestions from the previous turn
+      - Do not output placeholders like 'Suggestion 1'
 
       Output strictly as JSON: {
-        "optimizedPrompt": "The refined prompt as a single, cohesive string.",
-        "explanations": ["Brief explanation of change 1.", "Explanation of change 2."]
+        "optimizedPrompt": "The refined prompt as a clear, concise, and high-impact string.",
+        "explanations": [
+          "Brief explanation of the specific change made for the prompt.",
+          "Additional explanation of any other changes made to the prompt."
+        ],
+        "suggestions": ["Short actionable suggestion", "Another concise next step"]
       }
     `;
   }
   return `
-    You are a prompt engineering expert for large language models.
-    User input: "${prompt}"
+    You are a prompt engineering expert who specializes in optimizing prompts for large language models.
 
-    Transform this into an optimized prompt: Make it clear, concise, and high-impact. Use techniques like role assignment, context, output format, few-shot examples, or step-by-step guidance.
+    User input: "${prompt}".
+
+    Transform this prompt into an optimized prompt by making it clear, concise, and high-impact. 
+    Use techniques like role assignment, context, output format, few-shot examples, or step-by-step guidance to enhance the prompt. 
+    Analyze the prompt and identify areas for improvement. Aim for a prompt that is both precise and impactful.
+
+    Suggestions Guidelines:
+    - Return 2–3 concise next-step suggestion phrases (<=12 words each)
+    - No quotes or prefixes (avoid 'Ask the user:'), imperative mood
+    - Examples: 'Quantify revenue impact', 'Specify timeline'
+    - Do not repeat suggestions from the previous turn
+    - Do not output placeholders like 'Suggestion 1'
 
     Output strictly as JSON: {
-      "optimizedPrompt": "The fully optimized prompt as a single string.",
-      "explanations": ["Specific improvement 1.", "Improvement 2."]
+      "optimizedPrompt": "The fully optimized prompt as a clear, concise, and high-impact string.",
+      "explanations": [
+        "Specific explanation of how the prompt was improved in terms of clarity, specificity, and effectiveness.",
+        "Additional explanation of any other improvements made to the prompt."
+      ],
+      "suggestions": ["Short actionable suggestion", "Another concise next step"]
+    }
+  `;
+}
+
+/**
+ * Builds a prompt to generate concise clarifying questions for a selected suggestion.
+ */
+function buildClarifyPrompt(params: {
+  prompt: string;
+  previousOptimizedPrompt?: string;
+  selectedSuggestion: string;
+}): string {
+  const { prompt, previousOptimizedPrompt, selectedSuggestion } = params;
+  return `
+    You are assisting as a prompt engineer. Based on the user's original input and the current optimized prompt, 
+    generate the smallest set of clarifying questions needed to effectively apply the following next step:
+    Suggestion: "${selectedSuggestion}"
+
+    Context:
+    - Original input: "${prompt}"
+    - Current optimized prompt: "${previousOptimizedPrompt || "(not available)"}"
+
+    Guidelines:
+    - Return only a JSON object with a single key: "questions".
+    - Provide 2 to 4 concise, targeted questions.
+    - Avoid repeating information, avoid quotes and numbering.
+    - Each question should be self-contained and under 18 words.
+    - Do not repeat questions from the previous turn.
+    - Choose from canonical slots only if missing or ambiguous: {audience, desired outcome/metrics, tone, constraints (length/platform), timeframe, examples, domain nuances}.
+    - Ask only about missing or ambiguous items; do not ask what is already known.
+
+    Output strictly as JSON: { "questions": ["Question 1", "Question 2"] }
+  `;
+}
+
+/**
+ * Builds a prompt to refine the optimized prompt using Q&A answers.
+ */
+function buildRefineWithAnswersPrompt(params: {
+  previousOptimizedPrompt?: string;
+  answers: Array<{ question: string; answer: string }>;
+}): string {
+  const { previousOptimizedPrompt, answers } = params;
+  const qa = answers
+    .map((x) => `- ${x.question}: ${x.answer}`)
+    .join("\n");
+  return `
+    You are a prompt engineering expert specializing in iterative refinement.
+    Current optimized prompt: "${previousOptimizedPrompt || "(not available)"}"
+
+    Additional details provided by the user:
+    ${qa}
+
+    Refine the optimized prompt by incorporating the provided answers. Make targeted edits only to the parts affected by the answers. 
+    Preserve earlier constraints (tone, audience, platform/length). Ensure clarity, specificity, and effectiveness.
+    Do not add meta-commentary.
+
+    Output strictly as JSON: {
+      "optimizedPrompt": "The refined prompt as a single, cohesive string.",
+      "explanations": ["Most important change (<=18 words).", "Another key change (<=18 words)."],
+      "suggestions": [
+        "A concise next step to further improve the prompt",
+        "Another short actionable refinement"
+      ]
     }
   `;
 }
@@ -214,7 +355,9 @@ function parseResponse(text: string | undefined): ApiResponseSuccess {
 
 export async function POST(
   req: NextRequest
-): Promise<NextResponse<ApiResponseSuccess | ApiResponseError>> {
+): Promise<
+  NextResponse<ApiResponseSuccess | ApiResponseError | ApiResponseClarify>
+> {
   try {
     const body: ApiRequestBody = await req.json();
     const {
@@ -223,13 +366,43 @@ export async function POST(
       apiKey,
       previousPrompt,
       refinementInstruction,
+      task = "optimize",
+      selectedSuggestion,
+      previousOptimizedPrompt,
+      answers,
     } = body;
 
-    if ((!prompt && !previousPrompt) || !model || !apiKey) {
-      throw new ApiError(
-        "Missing required fields: prompt/previousPrompt, model, or apiKey",
-        400
-      );
+    // Basic required fields
+    if (!model || !apiKey) {
+      throw new ApiError("Missing required fields: model or apiKey", 400);
+    }
+
+    // Task-specific validation
+    if (task === "clarify") {
+      if (!selectedSuggestion) {
+        throw new ApiError("Missing selectedSuggestion for clarify task.", 400);
+      }
+      if (!prompt) {
+        throw new ApiError(
+          "Missing prompt for clarify task. Provide the latest user input as 'prompt'.",
+          400
+        );
+      }
+    } else if (task === "refine") {
+      if (!answers || answers.length === 0) {
+        throw new ApiError("Missing answers for refine task.", 400);
+      }
+      // No prompt/previousPrompt required for refine; it uses previousOptimizedPrompt + answers
+    } else {
+      // optimize default
+      const hasInitialPrompt = !!prompt;
+      const hasRefinementPair = !!previousPrompt && !!refinementInstruction;
+      if (!hasInitialPrompt && !hasRefinementPair) {
+        throw new ApiError(
+          "Missing required fields: provide 'prompt' OR 'previousPrompt' with 'refinementInstruction'",
+          400
+        );
+      }
     }
 
     const resolvedModel = model.trim();
@@ -245,30 +418,65 @@ export async function POST(
     const genAI = new GoogleGenAI({ apiKey });
     const supportsSchema = /1\.5|2\./.test(resolvedModel);
 
-    const fullPrompt = buildFullPrompt(
-      prompt || "",
-      previousPrompt,
-      refinementInstruction
-    );
-    const contents: ContentListUnion = fullPrompt;
+    let contents: ContentListUnion;
+    if (task === "clarify") {
+      if (!selectedSuggestion) {
+        throw new ApiError(
+          "Missing selectedSuggestion for clarify task.",
+          400
+        );
+      }
+      contents = buildClarifyPrompt({
+        prompt: prompt || "",
+        previousOptimizedPrompt,
+        selectedSuggestion,
+      });
+    } else if (task === "refine") {
+      if (!answers || answers.length === 0) {
+        throw new ApiError("Missing answers for refine task.", 400);
+      }
+      contents = buildRefineWithAnswersPrompt({
+        previousOptimizedPrompt,
+        answers,
+      });
+    } else {
+      const fullPrompt = buildFullPrompt(
+        prompt || "",
+        previousPrompt,
+        refinementInstruction
+      );
+      contents = fullPrompt;
+    }
 
     const config: GenerateContentConfig = {
       // Default to JSON output
       responseMimeType: "application/json",
+      // Reliability tuning
+      temperature: 0.3,
+      topP: 0.9,
+      topK: 32,
     };
 
     if (supportsSchema) {
-      config.responseSchema = {
-        type: "object",
-        properties: {
-          optimizedPrompt: { type: "string" },
-          explanations: {
-            type: "array",
-            items: { type: "string" },
+      if (task === "clarify") {
+        config.responseSchema = {
+          type: "object",
+          properties: {
+            questions: { type: "array", items: { type: "string" } },
           },
-        },
-        required: ["optimizedPrompt", "explanations"],
-      } as SchemaUnion;
+          required: ["questions"],
+        } as SchemaUnion;
+      } else {
+        config.responseSchema = {
+          type: "object",
+          properties: {
+            optimizedPrompt: { type: "string" },
+            explanations: { type: "array", items: { type: "string" } },
+            suggestions: { type: "array", items: { type: "string" } },
+          },
+          required: ["optimizedPrompt", "explanations"],
+        } as SchemaUnion;
+      }
     }
 
     const result = await generateWithRetry(
@@ -279,9 +487,36 @@ export async function POST(
     );
 
     const responseText = result.text as string | undefined;
-    const parsedData = parseResponse(responseText);
+    if (task === "clarify") {
+      try {
+        const parsed = JSON.parse(responseText || "{}") as ApiResponseClarify;
+        return NextResponse.json({ questions: parsed.questions || [] });
+      } catch {
+        const stripped = (responseText || "")
+          .replace(/^```json\s*/i, "")
+          .replace(/^```/, "")
+          .replace(/```$/, "")
+          .trim();
+        try {
+          const fallback = JSON.parse(stripped) as ApiResponseClarify;
+          return NextResponse.json({ questions: fallback.questions || [] });
+        } catch {
+          // Fallback to generic questions
+          return NextResponse.json({
+            questions: [
+              "What specific outcome do you want?",
+              "What measurable benefits should be highlighted?",
+            ],
+          });
+        }
+      }
+    }
 
-    return NextResponse.json(parsedData);
+    const parsedData = parseResponse(responseText);
+    return NextResponse.json({
+      ...parsedData,
+      suggestions: sanitizeSuggestions(parsedData.suggestions),
+    });
   } catch (error: unknown) {
     console.error("Error in GenAI API route:", error);
     const apiError =
