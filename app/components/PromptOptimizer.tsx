@@ -33,7 +33,7 @@ import { decryptSafe, getIV } from "../utils/cryptoUtils";
 import EmptyState from "./ui/EmptyState";
 import SessionCard from "./ui/SessionCard";
 
-if (!process.env.NEXT_PUBLIC_SECRET_KEY) {
+if (!process.env.NEXT_PUBLIC_SECRET_KEY && process.env.NODE_ENV !== "production") {
   console.warn(
     "NEXT_PUBLIC_SECRET_KEY is not defined in environment variables"
   );
@@ -74,6 +74,47 @@ const formatRelativeTime = (timestamp: number): string => {
   if (hours < 24) return `${hours}h ago`;
   if (days < 30) return `${days}d ago`;
   return new Date(timestamp).toLocaleDateString();
+};
+
+// --- Coaching State Persistence ---
+
+interface CoachingState {
+  qaActive: boolean;
+  qaQuestions: string[];
+  qaAnswers: string[];
+  qaSuggestion?: string;
+}
+
+const getCoachingStateKey = (sessionId: string) => `coaching:${sessionId}`;
+
+const saveCoachingState = (sessionId: string, state: CoachingState) => {
+  if (typeof window === "undefined" || !sessionId) return;
+  try {
+    localStorage.setItem(getCoachingStateKey(sessionId), JSON.stringify(state));
+  } catch (e) {
+    console.warn("Failed to save coaching state", e);
+  }
+};
+
+const loadCoachingState = (sessionId: string): CoachingState | null => {
+  if (typeof window === "undefined" || !sessionId) return null;
+  try {
+    const raw = localStorage.getItem(getCoachingStateKey(sessionId));
+    if (!raw) return null;
+    return JSON.parse(raw) as CoachingState;
+  } catch (e) {
+    console.warn("Failed to load coaching state", e);
+    return null;
+  }
+};
+
+const clearCoachingState = (sessionId: string) => {
+  if (typeof window === "undefined" || !sessionId) return;
+  try {
+    localStorage.removeItem(getCoachingStateKey(sessionId));
+  } catch (e) {
+    console.warn("Failed to clear coaching state", e);
+  }
 };
 
 // --- Main Component ---
@@ -175,6 +216,15 @@ export default function PromptOptimizer({
           ? data.messages
           : [];
         setMessages(loadedMessages);
+
+        // Restore coaching state if present
+        const coachingState = loadCoachingState(sessionId);
+        if (coachingState) {
+          setQaActive(coachingState.qaActive);
+          setQaQuestions(coachingState.qaQuestions);
+          setQaAnswers(coachingState.qaAnswers);
+          setQaSuggestion(coachingState.qaSuggestion);
+        }
       }
     } catch (e) {
       console.warn("Failed to load session data", e);
@@ -220,8 +270,26 @@ export default function PromptOptimizer({
           const sorted = updatedSessions.sort(
             (a, b) => b.updatedAt - a.updatedAt
           );
-          localStorage.setItem("chat_sessions", JSON.stringify(sorted));
-          return sorted;
+
+          // Limit to 50 most recent sessions to prevent LocalStorage quota issues
+          const MAX_SESSIONS = 50;
+          const cleanedSessions = sorted.slice(0, MAX_SESSIONS);
+
+          // Remove old session data from localStorage
+          if (sorted.length > MAX_SESSIONS) {
+            const removedSessions = sorted.slice(MAX_SESSIONS);
+            removedSessions.forEach((session) => {
+              try {
+                localStorage.removeItem(`chat:${session.id}`);
+                localStorage.removeItem(`coaching:${session.id}`);
+              } catch (error) {
+                console.error("Failed to remove old session", error);
+              }
+            });
+          }
+
+          localStorage.setItem("chat_sessions", JSON.stringify(cleanedSessions));
+          return cleanedSessions;
         });
       } catch (e) {
         console.warn("Failed to save session data", e);
@@ -233,7 +301,24 @@ export default function PromptOptimizer({
     };
   }, [sessionId, messages, loadingSession]);
 
-  const handleOptimize = async (isRefinement = false, instruction?: string) => {
+  // Auto-save coaching state whenever QA state changes
+  useEffect(() => {
+    if (typeof window === "undefined" || !sessionId || loadingSession) return;
+
+    const coachingState: CoachingState = {
+      qaActive,
+      qaQuestions,
+      qaAnswers,
+      qaSuggestion,
+    };
+
+    // Only save if there's active coaching state
+    if (qaActive || qaQuestions.length > 0) {
+      saveCoachingState(sessionId, coachingState);
+    }
+  }, [sessionId, qaActive, qaQuestions, qaAnswers, qaSuggestion, loadingSession]);
+
+  const handleOptimize = async (isRefinement = false, instruction?: string, silent = false) => {
     if (!isApiKeyValid) {
       toast.error("Please configure your API key in Settings.");
       return;
@@ -249,22 +334,37 @@ export default function PromptOptimizer({
     }
 
     setIsLoading(true);
-    const userMessage: ChatMessage = { role: "user", content };
-    const currentMessages = [...messages, userMessage];
-    setMessages(currentMessages);
-    setInput("");
+
+    // Only add user message if not silent (silent mode is for applying suggestions directly)
+    const currentMessages = silent
+      ? messages
+      : [...messages, { role: "user" as const, content }];
+
+    if (!silent) {
+      setMessages(currentMessages);
+      setInput("");
+    }
 
     try {
-      const payload = {
-        model: selectedModel,
-        apiKey,
-        ...(isRefinement
-          ? {
-              refinementInstruction: content,
-              previousPrompt: latestOptimizedPrompt || input,
-            }
-          : { prompt: content }),
-      };
+      const lastUser = [...messages]
+        .reverse()
+        .find((m) => m.role === "user")?.content || input || "";
+      const previousPromptCandidate = (latestOptimizedPrompt || lastUser || "").trim();
+      const isValidRefine = isRefinement && previousPromptCandidate.length > 0;
+
+      const payload = isValidRefine
+        ? {
+            model: selectedModel,
+            apiKey,
+            refinementInstruction: content,
+            previousPrompt: previousPromptCandidate,
+          }
+        : {
+            model: selectedModel,
+            apiKey,
+            // Fall back to an initial optimize when we don't yet have a prior prompt
+            prompt: isRefinement ? lastUser || content : content,
+          };
 
       const response = await fetch("/api/gemini", {
         method: "POST",
@@ -286,7 +386,11 @@ export default function PromptOptimizer({
       };
 
       setMessages([...currentMessages, newAssistantMessage]);
-      toast.success(isRefinement ? "Prompt refined" : "Prompt optimized");
+      toast.success(
+        silent
+          ? "Suggestion applied successfully"
+          : (isRefinement ? "Prompt refined" : "Prompt optimized")
+      );
     } catch (error: unknown) {
       const errorMessage =
         (error as Error).message || "An unknown error occurred.";
@@ -312,7 +416,8 @@ export default function PromptOptimizer({
       toast.error("Please configure your API key in Settings.");
       return;
     }
-    if (isClarifying) return; // prevent double-clicks while loading questions
+    if (isClarifying || isLoading) return; // prevent double-clicks while loading
+
     try {
       setIsClarifying(true);
       setQaActive(false);
@@ -336,11 +441,17 @@ export default function PromptOptimizer({
       const data = await response.json();
       if (!response.ok) throw new Error(data?.error || "Failed to get clarifying questions.");
       const qs: string[] = Array.isArray(data?.questions) ? data.questions.slice(0, 4) : [];
+
       if (qs.length === 0) {
-        toast("No questions needed. Refining now...");
-        await handleRefineFromQA([]);
+        // Clean up clarifying state BEFORE applying suggestion
+        setIsClarifying(false);
+        setQaSuggestion(undefined);
+
+        // When no questions, apply the suggestion silently (no user message added)
+        await handleOptimize(true, suggestion, true); // true = silent mode
         return;
       }
+
       setQaQuestions(qs);
       setQaAnswers(new Array(qs.length).fill(""));
       setQaActive(true);
@@ -349,7 +460,10 @@ export default function PromptOptimizer({
       console.warn(msg);
       toast.error(msg);
     } finally {
-      setIsClarifying(false);
+      // Only reset if we're showing the Q&A form (not if we applied silently)
+      if (!isLoading) {
+        setIsClarifying(false);
+      }
     }
   };
 
@@ -363,6 +477,12 @@ export default function PromptOptimizer({
     try {
       setIsRefiningWithAnswers(true);
       const pairs = providedAnswers ?? qaQuestions.map((q, i) => ({ question: q, answer: qaAnswers[i] || "" }));
+
+      // Safety check: if no answers provided, don't proceed
+      if (!pairs || pairs.length === 0) {
+        throw new Error("Missing answers for refine task.");
+      }
+
       const response = await fetch("/api/gemini", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -388,6 +508,10 @@ export default function PromptOptimizer({
       setQaQuestions([]);
       setQaAnswers([]);
       setQaSuggestion(undefined);
+
+      // Clear coaching state from localStorage when user completes the refinement
+      clearCoachingState(sessionId);
+
       toast.success("Refined with your details");
     } catch (e) {
       const msg = (e as Error).message || "Refinement failed.";
@@ -892,6 +1016,8 @@ export default function PromptOptimizer({
                           setQaQuestions([]);
                           setQaAnswers([]);
                           setQaSuggestion(undefined);
+                          // Clear coaching state from localStorage when user cancels
+                          clearCoachingState(sessionId);
                         }}
                         className="px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-gray-300 bg-slate-100 dark:bg-gray-700 rounded-lg hover:bg-slate-200 dark:hover:bg-gray-600 transition-colors"
                       >

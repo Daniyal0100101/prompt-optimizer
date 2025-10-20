@@ -47,6 +47,7 @@ export default function Home() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [homeInput, setHomeInput] = useState("");
   const [isStarting, setIsStarting] = useState(false);
+  const [loadingStage, setLoadingStage] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchFilter, setSearchFilter] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -110,9 +111,28 @@ export default function Home() {
   }, [homeInput]);
 
   const persistSessions = useCallback((updatedSessions: Session[]) => {
-    setSessions(updatedSessions);
+    // Limit to 50 most recent sessions to prevent LocalStorage quota issues
+    const MAX_SESSIONS = 50;
+    const cleanedSessions = updatedSessions
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .slice(0, MAX_SESSIONS);
+
+    // Remove old session data from localStorage
+    if (updatedSessions.length > MAX_SESSIONS) {
+      const removedSessions = updatedSessions.slice(MAX_SESSIONS);
+      removedSessions.forEach((session) => {
+        try {
+          localStorage.removeItem(`chat:${session.id}`);
+          localStorage.removeItem(`coaching:${session.id}`);
+        } catch (error) {
+          console.error("Failed to remove old session", error);
+        }
+      });
+    }
+
+    setSessions(cleanedSessions);
     try {
-      localStorage.setItem("chat_sessions", JSON.stringify(updatedSessions));
+      localStorage.setItem("chat_sessions", JSON.stringify(cleanedSessions));
     } catch (error) {
       console.error("Failed to save sessions", error);
     }
@@ -129,6 +149,7 @@ export default function Home() {
     }
 
     setIsStarting(true);
+    setLoadingStage("Preparing your request...");
     const id = newId();
 
     try {
@@ -138,6 +159,7 @@ export default function Home() {
         throw new Error("API key not found in localStorage.");
       }
 
+      setLoadingStage("Validating credentials...");
       const iv = getIV(SECRET_KEY);
       const result = decryptSafe(savedKey, SECRET_KEY, iv);
 
@@ -152,12 +174,16 @@ export default function Home() {
 
       const decryptedKey = result.plaintext;
 
+      setLoadingStage("Analyzing your prompt...");
+      await new Promise(resolve => setTimeout(resolve, 400));
+
+      setLoadingStage("Optimizing with AI...");
       const res = await fetch("/api/gemini", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           prompt: text,
-          model: "gemini-1.5-flash",
+          model: "gemini-2.0-flash",
           apiKey: decryptedKey,
         }),
       });
@@ -166,6 +192,9 @@ export default function Home() {
       if (!res.ok) {
         throw new Error(data?.error || "Failed to optimize prompt.");
       }
+
+      setLoadingStage("Finalizing results...");
+      await new Promise(resolve => setTimeout(resolve, 300));
 
       const messages = [
         { role: "user", content: text },
@@ -186,6 +215,8 @@ export default function Home() {
       };
       persistSessions([newSession, ...sessions]);
 
+      setLoadingStage("Redirecting...");
+      await new Promise(resolve => setTimeout(resolve, 200));
       router.push(`/optimize/${id}`);
     } catch (error: unknown) {
       const errorMessage =
@@ -194,6 +225,7 @@ export default function Home() {
       toast.error(errorMessage);
     } finally {
       setIsStarting(false);
+      setLoadingStage("");
     }
   };
 
@@ -218,7 +250,31 @@ export default function Home() {
   ];
 
   return (
-    <main className="min-h-[100svh] sm:min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30 dark:from-gray-950 dark:via-gray-900 dark:to-blue-950/20">
+    <main className="min-h-[100svh] sm:min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30 dark:from-gray-950 dark:via-gray-900 dark:to-blue-950/20 relative">
+      {isStarting && loadingStage === "Redirecting..." && (
+        <div className="fixed inset-0 z-50 bg-gradient-to-br from-blue-500/95 via-purple-500/95 to-indigo-500/95 dark:from-blue-600/95 dark:via-purple-600/95 dark:to-indigo-600/95 backdrop-blur-md flex items-center justify-center animate-fade-in">
+          <div className="text-center space-y-6 px-6">
+            <div className="relative mx-auto w-24 h-24">
+              <div className="absolute inset-0 rounded-full border-4 border-white/30 border-t-white animate-spin"></div>
+              <div className="absolute inset-2 rounded-full border-4 border-transparent border-t-white/60 animate-spin-reverse"></div>
+              <div className="absolute inset-4 rounded-full border-4 border-transparent border-t-white/40 animate-spin-slow"></div>
+            </div>
+            <div className="space-y-3">
+              <h2 className="text-2xl font-bold text-white drop-shadow-lg">
+                Opening Your Optimized Prompt
+              </h2>
+              <p className="text-white/90 text-sm max-w-md mx-auto">
+                Your AI-enhanced prompt is ready. Taking you there now...
+              </p>
+            </div>
+            <div className="flex justify-center gap-2">
+              <span className="w-2 h-2 bg-white rounded-full animate-bounce-delay-0"></span>
+              <span className="w-2 h-2 bg-white rounded-full animate-bounce-delay-150"></span>
+              <span className="w-2 h-2 bg-white rounded-full animate-bounce-delay-300"></span>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="container mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-8 max-w-4xl">
         <header className="text-center mb-8 sm:mb-12">
           <div className="relative">
@@ -245,7 +301,7 @@ export default function Home() {
         <form onSubmit={handleStartFromHome} className="relative mb-12">
           {!hasKey && (
             <div className="absolute -top-3 left-6 z-30 px-3 py-1.5 bg-gradient-to-r from-amber-500/95 to-orange-500/95 dark:from-amber-600/95 dark:to-orange-600/95 text-white text-xs font-semibold rounded-full shadow-lg backdrop-blur-sm border border-white/20">
-              <span className="relative flex h-2 w-2 mr-2 inline-block">
+              <span className="relative flex h-2 w-2 mr-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white/80"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
               </span>
@@ -265,6 +321,7 @@ export default function Home() {
             }
             disabled={!hasKey}
             isLoading={isStarting}
+            loadingStage={loadingStage}
             maxLength={1000}
             submitButtonText="Optimize"
           />

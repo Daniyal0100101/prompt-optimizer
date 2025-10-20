@@ -57,6 +57,12 @@ function sanitizeSuggestions(suggestions?: string[]): string[] {
  */
 function getFriendlyErrorMessage(status: number, raw: string): string {
   const msg = raw?.toLowerCase() || "";
+
+  // Handle 404 model not found errors
+  if (status === 404 || msg.includes("not found") || msg.includes("models/")) {
+    return "The selected AI model is currently unavailable. Please try a different model in Settings or wait a moment.";
+  }
+
   if (
     status === 503 ||
     msg.includes("overload") ||
@@ -67,6 +73,12 @@ function getFriendlyErrorMessage(status: number, raw: string): string {
   if (status === 429 || msg.includes("rate") || msg.includes("quota")) {
     return "You're sending requests too quickly or have hit a quota limit. Please wait and try again.";
   }
+
+  // Handle context length errors for long conversations
+  if (msg.includes("context") || msg.includes("token") || msg.includes("length")) {
+    return "The conversation is too long. Please start a new chat to continue.";
+  }
+
   if (status === 400) {
     // Preserve specific client errors (e.g., validation) but make them friendly if generic
     if (/missing required fields/i.test(raw)) {
@@ -125,7 +137,7 @@ class ApiError extends Error {
 /**
  * Generates content with a retry mechanism for transient errors.
  * @param genAI - The GoogleGenAI instance.
- * @param model - The model to use for generation.
+ * @param modelId - The model ID to use for generation (without 'models/' prefix).
  * @param contents - The content to send to the model.
  * @param config - The generation configuration.
  * @param retries - The number of retry attempts.
@@ -134,7 +146,7 @@ class ApiError extends Error {
  */
 async function generateWithRetry(
   genAI: GoogleGenAI,
-  model: string,
+  modelId: string,
   contents: ContentListUnion,
   config: GenerateContentConfig,
   retries = 3,
@@ -142,8 +154,10 @@ async function generateWithRetry(
 ): Promise<GenerateContentResponse> {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
+      // Use just the model ID without 'models/' prefix
+      // The SDK will handle the path formatting internally
       return await genAI.models.generateContent({
-        model,
+        model: modelId,
         contents,
         config,
       });
@@ -362,7 +376,7 @@ export async function POST(
     const body: ApiRequestBody = await req.json();
     const {
       prompt,
-      model = "gemini-1.5-flash",
+      model = "gemini-2.0-flash",
       apiKey,
       previousPrompt,
       refinementInstruction,
@@ -451,10 +465,12 @@ export async function POST(
     const config: GenerateContentConfig = {
       // Default to JSON output
       responseMimeType: "application/json",
-      // Reliability tuning
+      // Reliability tuning - optimized for lower token usage
       temperature: 0.3,
       topP: 0.9,
       topK: 32,
+      // Limit output tokens to reduce costs and improve response time
+      maxOutputTokens: task === "clarify" ? 512 : 2048, // Clarify needs fewer tokens
     };
 
     if (supportsSchema) {
@@ -462,7 +478,11 @@ export async function POST(
         config.responseSchema = {
           type: "object",
           properties: {
-            questions: { type: "array", items: { type: "string" } },
+            questions: {
+              type: "array",
+              items: { type: "string" },
+              maxItems: 4, // Limit questions to reduce token usage
+            },
           },
           required: ["questions"],
         } as SchemaUnion;
@@ -471,8 +491,16 @@ export async function POST(
           type: "object",
           properties: {
             optimizedPrompt: { type: "string" },
-            explanations: { type: "array", items: { type: "string" } },
-            suggestions: { type: "array", items: { type: "string" } },
+            explanations: {
+              type: "array",
+              items: { type: "string" },
+              maxItems: 5, // Limit explanations
+            },
+            suggestions: {
+              type: "array",
+              items: { type: "string" },
+              maxItems: 3, // Limit suggestions
+            },
           },
           required: ["optimizedPrompt", "explanations"],
         } as SchemaUnion;

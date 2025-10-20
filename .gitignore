@@ -6,10 +6,15 @@ dist/
 .cache/
 .turbo/
 .vercel/
+.vercel/
+.cursor/
+.vscode/
 
 # env / local
 .env*
 .DS_Store
+.env.local
+AGENTS.md
 
 # logs
 npm-debug.log*

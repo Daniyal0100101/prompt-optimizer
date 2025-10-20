@@ -10,6 +10,7 @@ interface TextareaInputProps {
   placeholder?: string;
   disabled?: boolean;
   isLoading?: boolean;
+  loadingStage?: string;
   maxLength?: number;
   minHeight?: number;
   maxHeight?: number;
@@ -27,6 +28,7 @@ const TextareaInput = forwardRef<HTMLTextAreaElement, TextareaInputProps>(
       placeholder = "Enter your text here...",
       disabled = false,
       isLoading = false,
+      loadingStage,
       maxLength = 1000,
       minHeight = 64,
       maxHeight = 200,
@@ -62,7 +64,7 @@ const TextareaInput = forwardRef<HTMLTextAreaElement, TextareaInputProps>(
 
     return (
       <div
-        className={`relative bg-gradient-to-br from-white/95 to-slate-50/95 dark:from-gray-900/95 dark:to-gray-800/95 
+        className={`relative bg-gradient-to-br from-white/95 to-slate-50/95 dark:from-gray-900/95 dark:to-gray-800/95
                    rounded-2xl shadow-2xl backdrop-blur-sm transition-all duration-500 ease-out
                    ${
                      isFocused
@@ -70,6 +72,30 @@ const TextareaInput = forwardRef<HTMLTextAreaElement, TextareaInputProps>(
                        : "ring-1 ring-slate-200/80 dark:ring-gray-700/80 hover:ring-slate-300/80 dark:hover:ring-gray-600/80"
                    } ${className}`}
       >
+        {isLoading && loadingStage && (
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-purple-500/5 to-indigo-500/5 dark:from-blue-400/10 dark:via-purple-400/10 dark:to-indigo-400/10 rounded-2xl z-30 backdrop-blur-[2px] animate-pulse">
+            <div className="flex items-center justify-center h-full">
+              <div className="bg-white/95 dark:bg-gray-800/95 rounded-xl px-6 py-4 shadow-2xl border border-blue-200/50 dark:border-blue-700/50 backdrop-blur-sm">
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <div className="w-6 h-6 border-3 border-blue-500/30 dark:border-blue-400/30 border-t-blue-600 dark:border-t-blue-400 rounded-full animate-spin"></div>
+                    <div className="absolute inset-0 w-6 h-6 border-3 border-transparent border-t-purple-500/40 dark:border-t-purple-400/40 rounded-full animate-spin-reverse"></div>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-semibold text-slate-900 dark:text-gray-100 animate-pulse">
+                      {loadingStage}
+                    </span>
+                    <div className="flex gap-1 mt-1">
+                      <span className="w-1.5 h-1.5 bg-blue-500 dark:bg-blue-400 rounded-full animate-bounce-delay-0"></span>
+                      <span className="w-1.5 h-1.5 bg-purple-500 dark:bg-purple-400 rounded-full animate-bounce-delay-150"></span>
+                      <span className="w-1.5 h-1.5 bg-indigo-500 dark:bg-indigo-400 rounded-full animate-bounce-delay-300"></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         <div className="p-5">
           <div className="relative">
             <textarea

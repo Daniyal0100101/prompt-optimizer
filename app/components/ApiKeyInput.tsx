@@ -48,15 +48,14 @@ export default function ApiKeyInput({
 
           // If decryption succeeds and there's a plaintext, trust the stored key without re-validating.
           // Validation is enforced when the user first saves the key.
-          if (result.ok && result.plaintext) {
+          if (result.ok) {
             setApiKey(result.plaintext);
             setIsValid(true);
             setIsSaved(true);
             onKeyVerified(true);
             return;
-          } else if (!result.ok) {
-            console.warn("Decryption failed:", result.reason);
           }
+          // Decryption failed, will try fallback
         } catch {
           console.warn(
             "Failed to decrypt with current key, trying fallback..."
@@ -70,7 +69,7 @@ export default function ApiKeyInput({
             const iv = getIV(FALLBACK_KEY);
             const result = decryptSafe(savedKey, FALLBACK_KEY, iv);
 
-            if (result.ok && result.plaintext) {
+            if (result.ok) {
               // Re-encrypt with the new key for next time
               const newIv = getIV(SECRET_KEY);
               const encrypted = encryptSafe(result.plaintext, SECRET_KEY, newIv);
@@ -82,9 +81,8 @@ export default function ApiKeyInput({
               setIsSaved(true);
               onKeyVerified(true);
               return;
-            } else if (!result.ok) {
-              console.warn("Fallback decryption failed:", result.reason);
             }
+            // Fallback decryption failed
           } catch {
             console.warn("Failed to decrypt with fallback key");
           }
