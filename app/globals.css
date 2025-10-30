@@ -351,3 +351,9 @@ html {
     animation: none;
   }
 }
+
+.scroll-y-stable {
+  overflow-y: scroll;
+  scrollbar-gutter: stable both-edges;
+  overscroll-behavior: contain;
+}

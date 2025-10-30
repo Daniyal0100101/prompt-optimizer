@@ -207,17 +207,16 @@ function buildFullPrompt(
       User feedback: "${refinementInstruction}".
 
       Refine the prompt, considering the feedback, by making targeted, meaningful changes. 
-      Analyze the feedback and integrate it thoughtfully into the prompt. Ensure clarity, specificity, and effectiveness. 
+      Analyze the feedback and integrate it thoughtfully into the prompt. Ensure clarity, specificity, structure and effectiveness. 
       Avoid appending the instruction verbatim and instead focus on integrating it in a way that enhances the prompt.
 
       Preserve the user's original tone, keywords, terminology, and language unless explicitly asked to change them. 
-      If you change a key term, keep it minimal and justify briefly in explanations.
+      If you change a key term, keep it minimal and justify briefly in explanations. If you change the structure, justify briefly in explanations.
 
       Quality Checklist (apply silently):
-      - Clarity and specificity
-      - Audience fit
+      - Clarity, specificity and structure
+      - Audience fit and structure
       - Platform/length constraints enforced (if applicable)
-      - Structure/output format appropriate
       - Avoid boilerplate
       - Maintain user language
 
@@ -225,13 +224,13 @@ function buildFullPrompt(
       - Provide 2–3 concise next-step suggestion phrases (<=12 words each)
       - Do not use quotes or prefixes like 'Ask the user:'
       - Use imperative mood, e.g. 'Quantify benefits'
-      - Do not repeat suggestions from the previous turn
+      - Do not repeat suggestions from the previous turn, do not suggest the same suggestion twice.
       - Do not output placeholders like 'Suggestion 1'
 
       Output strictly as JSON: {
-        "optimizedPrompt": "The refined prompt as a clear, concise, and high-impact string.",
+        "optimizedPrompt": "The refined prompt as a clear, structured, and high-impact string.",
         "explanations": [
-          "Brief explanation of the specific change made for the prompt.",
+          "Brief explanation of the specific change made for the prompt, including the structure if changed.",
           "Additional explanation of any other changes made to the prompt."
         ],
         "suggestions": ["Short actionable suggestion", "Another concise next step"]
@@ -243,21 +242,21 @@ function buildFullPrompt(
 
     User input: "${prompt}".
 
-    Transform this prompt into an optimized prompt by making it clear, concise, and high-impact. 
+    Transform this prompt into an optimized prompt by making it clear, structured, and high-impact. 
     Use techniques like role assignment, context, output format, few-shot examples, or step-by-step guidance to enhance the prompt. 
-    Analyze the prompt and identify areas for improvement. Aim for a prompt that is both precise and impactful.
+    Analyze the prompt and identify areas for improvement. Aim for a prompt that is both precise, structured and impactful.
 
     Suggestions Guidelines:
     - Return 2–3 concise next-step suggestion phrases (<=12 words each)
     - No quotes or prefixes (avoid 'Ask the user:'), imperative mood
-    - Examples: 'Quantify revenue impact', 'Specify timeline'
-    - Do not repeat suggestions from the previous turn
+    - Examples: 'Quantify revenue impact', 'Specify timeline', 'Provide specific examples'
+    - Do not repeat suggestions from the previous turn, do not suggest the same suggestion twice.
     - Do not output placeholders like 'Suggestion 1'
 
     Output strictly as JSON: {
-      "optimizedPrompt": "The fully optimized prompt as a clear, concise, and high-impact string.",
+      "optimizedPrompt": "The fully optimized prompt as a clear, structured, and high-impact string.",
       "explanations": [
-        "Specific explanation of how the prompt was improved in terms of clarity, specificity, and effectiveness.",
+        "Specific explanation of how the prompt was improved in terms of clarity, specificity, structure and effectiveness.",
         "Additional explanation of any other improvements made to the prompt."
       ],
       "suggestions": ["Short actionable suggestion", "Another concise next step"]
@@ -288,7 +287,7 @@ function buildClarifyPrompt(params: {
     - Provide 2 to 4 concise, targeted questions.
     - Avoid repeating information, avoid quotes and numbering.
     - Each question should be self-contained and under 18 words.
-    - Do not repeat questions from the previous turn.
+    - Do not repeat questions from the previous turn, do not ask the same question twice.
     - Choose from canonical slots only if missing or ambiguous: {audience, desired outcome/metrics, tone, constraints (length/platform), timeframe, examples, domain nuances}.
     - Ask only about missing or ambiguous items; do not ask what is already known.
 

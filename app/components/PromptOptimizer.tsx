@@ -33,7 +33,10 @@ import { decryptSafe, getIV } from "../utils/cryptoUtils";
 import EmptyState from "./ui/EmptyState";
 import SessionCard from "./ui/SessionCard";
 
-if (!process.env.NEXT_PUBLIC_SECRET_KEY && process.env.NODE_ENV !== "production") {
+if (
+  !process.env.NEXT_PUBLIC_SECRET_KEY &&
+  process.env.NODE_ENV !== "production"
+) {
   console.warn(
     "NEXT_PUBLIC_SECRET_KEY is not defined in environment variables"
   );
@@ -138,11 +141,15 @@ export default function PromptOptimizer({
   const [sessions, setSessions] = useState<Session[]>([]);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [loadingSession, setLoadingSession] = useState(true);
+  const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] =
+    useState(false);
   // Clarify/Refine flow state
   const [qaActive, setQaActive] = useState(false);
   const [qaQuestions, setQaQuestions] = useState<string[]>([]);
   const [qaAnswers, setQaAnswers] = useState<string[]>([]);
-  const [qaSuggestion, setQaSuggestion] = useState<string | undefined>(undefined);
+  const [qaSuggestion, setQaSuggestion] = useState<string | undefined>(
+    undefined
+  );
   const [isClarifying, setIsClarifying] = useState(false);
   const [isRefiningWithAnswers, setIsRefiningWithAnswers] = useState(false);
   // Removed inline rename/delete state in favor of reusable SessionCard component
@@ -197,6 +204,29 @@ export default function PromptOptimizer({
       setIsApiKeyValid(true);
     }
   }, [apiKeyProp, loadSettingsFromStorage]);
+
+  // Persist desktop sidebar collapsed state
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const saved = localStorage.getItem("desktop_sidebar_collapsed");
+      setIsDesktopSidebarCollapsed(saved === "1");
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.setItem(
+        "desktop_sidebar_collapsed",
+        isDesktopSidebarCollapsed ? "1" : "0"
+      );
+    } catch {
+      // ignore
+    }
+  }, [isDesktopSidebarCollapsed]);
 
   // Load sessions and current chat from localStorage
   useEffect(() => {
@@ -288,7 +318,10 @@ export default function PromptOptimizer({
             });
           }
 
-          localStorage.setItem("chat_sessions", JSON.stringify(cleanedSessions));
+          localStorage.setItem(
+            "chat_sessions",
+            JSON.stringify(cleanedSessions)
+          );
           return cleanedSessions;
         });
       } catch (e) {
@@ -316,9 +349,20 @@ export default function PromptOptimizer({
     if (qaActive || qaQuestions.length > 0) {
       saveCoachingState(sessionId, coachingState);
     }
-  }, [sessionId, qaActive, qaQuestions, qaAnswers, qaSuggestion, loadingSession]);
+  }, [
+    sessionId,
+    qaActive,
+    qaQuestions,
+    qaAnswers,
+    qaSuggestion,
+    loadingSession,
+  ]);
 
-  const handleOptimize = async (isRefinement = false, instruction?: string, silent = false) => {
+  const handleOptimize = async (
+    isRefinement = false,
+    instruction?: string,
+    silent = false
+  ) => {
     if (!isApiKeyValid) {
       toast.error("Please configure your API key in Settings.");
       return;
@@ -346,10 +390,15 @@ export default function PromptOptimizer({
     }
 
     try {
-      const lastUser = [...messages]
-        .reverse()
-        .find((m) => m.role === "user")?.content || input || "";
-      const previousPromptCandidate = (latestOptimizedPrompt || lastUser || "").trim();
+      const lastUser =
+        [...messages].reverse().find((m) => m.role === "user")?.content ||
+        input ||
+        "";
+      const previousPromptCandidate = (
+        latestOptimizedPrompt ||
+        lastUser ||
+        ""
+      ).trim();
       const isValidRefine = isRefinement && previousPromptCandidate.length > 0;
 
       const payload = isValidRefine
@@ -389,7 +438,9 @@ export default function PromptOptimizer({
       toast.success(
         silent
           ? "Suggestion applied successfully"
-          : (isRefinement ? "Prompt refined" : "Prompt optimized")
+          : isRefinement
+          ? "Prompt refined"
+          : "Prompt optimized"
       );
     } catch (error: unknown) {
       const errorMessage =
@@ -425,7 +476,10 @@ export default function PromptOptimizer({
       setQaAnswers([]);
       setQaSuggestion(suggestion);
 
-      const lastUser = [...messages].reverse().find((m) => m.role === "user")?.content || input || "";
+      const lastUser =
+        [...messages].reverse().find((m) => m.role === "user")?.content ||
+        input ||
+        "";
       const response = await fetch("/api/gemini", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -439,8 +493,11 @@ export default function PromptOptimizer({
         }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data?.error || "Failed to get clarifying questions.");
-      const qs: string[] = Array.isArray(data?.questions) ? data.questions.slice(0, 4) : [];
+      if (!response.ok)
+        throw new Error(data?.error || "Failed to get clarifying questions.");
+      const qs: string[] = Array.isArray(data?.questions)
+        ? data.questions.slice(0, 4)
+        : [];
 
       if (qs.length === 0) {
         // Clean up clarifying state BEFORE applying suggestion
@@ -456,7 +513,8 @@ export default function PromptOptimizer({
       setQaAnswers(new Array(qs.length).fill(""));
       setQaActive(true);
     } catch (e) {
-      const msg = (e as Error).message || "Unable to fetch clarifying questions.";
+      const msg =
+        (e as Error).message || "Unable to fetch clarifying questions.";
       console.warn(msg);
       toast.error(msg);
     } finally {
@@ -476,7 +534,12 @@ export default function PromptOptimizer({
     }
     try {
       setIsRefiningWithAnswers(true);
-      const pairs = providedAnswers ?? qaQuestions.map((q, i) => ({ question: q, answer: qaAnswers[i] || "" }));
+      const pairs =
+        providedAnswers ??
+        qaQuestions.map((q, i) => ({
+          question: q,
+          answer: qaAnswers[i] || "",
+        }));
 
       // Safety check: if no answers provided, don't proceed
       if (!pairs || pairs.length === 0) {
@@ -495,7 +558,8 @@ export default function PromptOptimizer({
         }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data?.error || "Failed to refine with answers.");
+      if (!response.ok)
+        throw new Error(data?.error || "Failed to refine with answers.");
 
       const newAssistantMessage: ChatMessage = {
         role: "assistant",
@@ -590,8 +654,11 @@ export default function PromptOptimizer({
     };
 
     return (
-      <aside className="relative flex flex-col h-full w-full max-w-sm bg-white dark:bg-gray-900 border-r border-slate-200 dark:border-gray-800 shadow-lg scrollbar-thin scroll-smooth">
-        <div className="p-4 border-b border-slate-200 dark:border-gray-800 bg-gradient-to-r from-blue-50 to-white dark:from-gray-900 dark:to-gray-800">
+      <aside
+        className="relative flex flex-col h-screen max-h-screen overflow-hidden w-full max-w-sm 
+                 bg-white dark:bg-gray-900 border-r border-slate-200 dark:border-gray-800 shadow-lg"
+      >
+        <div className="p-2 border-b border-slate-200 dark:border-gray-800 bg-gradient-to-r from-blue-50 to-white dark:from-gray-900 dark:to-gray-800">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-semibold text-slate-900 dark:text-gray-100 text-lg">
               History
@@ -626,7 +693,7 @@ export default function PromptOptimizer({
         <div
           ref={historyRef}
           onScroll={updateHistoryScrollState}
-          className="flex-1 overflow-y-auto p-4 scrollbar-thin scroll-smooth"
+          className="flex-1 overflow-y-auto scrollbar-thin pr-1 -mr-1"
           tabIndex={0}
           aria-label="Conversation history"
         >
@@ -695,7 +762,9 @@ export default function PromptOptimizer({
         <div className="pointer-events-none absolute right-3 bottom-3 flex flex-col gap-2">
           {canScrollDown && (
             <button
-              onClick={() => safeScrollTo(historyRef.current?.scrollHeight || 0)}
+              onClick={() =>
+                safeScrollTo(historyRef.current?.scrollHeight || 0)
+              }
               className="pointer-events-auto px-2 py-1 text-xs rounded-md bg-slate-100 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:bg-slate-200 dark:hover:bg-gray-700 text-slate-700 dark:text-gray-300 transition-colors"
               aria-label="Scroll to bottom"
             >
@@ -717,7 +786,7 @@ export default function PromptOptimizer({
   };
 
   return (
-    <div className="min-h-[100svh] sm:min-h-screen flex bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+    <div className="h-screen overflow-hidden flex bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
       {isHistoryOpen && (
         <div
           className="fixed inset-0 z-30 bg-black/50 lg:hidden"
@@ -736,368 +805,427 @@ export default function PromptOptimizer({
         </div>
       </div>
 
-      <div className="hidden lg:flex lg:w-80">
-        <HistoryPanel />
+      <div
+        className={`hidden lg:flex h-full transition-all duration-300 overflow-hidden ${
+          isDesktopSidebarCollapsed ? "lg:w-0" : "lg:w-80"
+        }`}
+        aria-hidden={isDesktopSidebarCollapsed}
+      >
+        <div
+          className={`${
+            isDesktopSidebarCollapsed
+              ? "opacity-0 pointer-events-none"
+              : "opacity-100"
+          } transition-opacity duration-200 w-full`}
+        >
+          <HistoryPanel />
+        </div>
       </div>
 
-      <main className="flex-1 flex flex-col min-h-0">
-        <header className="sticky top-0 z-20 flex items-center justify-between p-4 bg-white/90 dark:bg-gray-900/90 backdrop-blur border-b border-slate-200 dark:border-gray-800 shadow-md">
-          <div className="flex items-center gap-3">
-            <button
-              className="lg:hidden p-2 -ml-2 rounded-lg hover:bg-slate-100 dark:hover:bg-gray-800 transition-all duration-200"
-              onClick={() => setIsHistoryOpen(true)}
-              aria-label="Open sidebar"
-            >
-              <Menu className="w-5 h-5" />
-            </button>
-            <h1 className="text-lg font-bold text-slate-900 dark:text-gray-100">
-              Prompt Optimizer
-            </h1>
-          </div>
-          {!isApiKeyValid && (
-            <Link
-              href="/settings"
-              className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-100 dark:bg-amber-900/30 rounded-lg hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-all duration-200"
-            >
-              <Settings className="w-3 h-3" />
-              Setup Required
-            </Link>
-          )}
-        </header>
+      <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
+        <main className="flex-1 flex flex-col min-h-0">
+          <header className="sticky top-0 z-20 flex items-center justify-between p-3 bg-white/90 dark:bg-gray-900/90 backdrop-blur border-b border-slate-200 dark:border-gray-800 shadow-md">
+            <div className="flex items-center gap-2">
+              <button
+                className="lg:hidden p-2 -ml-2 rounded-lg hover:bg-slate-100 dark:hover:bg-gray-800 transition-all duration-200"
+                onClick={() => setIsHistoryOpen(true)}
+                aria-label="Open sidebar"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+              <button
+                className="hidden lg:inline-flex p-2 -ml-2 rounded-lg hover:bg-slate-100 dark:hover:bg-gray-800 transition-all duration-200"
+                onClick={() => setIsDesktopSidebarCollapsed((v) => !v)}
+                aria-label={
+                  isDesktopSidebarCollapsed
+                    ? "Expand sidebar"
+                    : "Collapse sidebar"
+                }
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+              <h1 className="text-lg font-bold text-slate-900 dark:text-gray-100">
+                Prompt Optimizer
+              </h1>
+            </div>
+            {!isApiKeyValid && (
+              <Link
+                href="/settings"
+                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-100 dark:bg-amber-900/30 rounded-lg hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-all duration-200"
+              >
+                <Settings className="w-3 h-3" />
+                Setup Required
+              </Link>
+            )}
+          </header>
 
-        <div className="flex-1 min-h-0 overflow-y-auto bg-gradient-to-b from-white/80 to-indigo-50 dark:from-gray-900/80 dark:to-gray-950 scroll-pb-28 sm:scroll-pb-32 scrollbar-thin scroll-smooth">
-          {loadingSession ? (
-            <div className="flex justify-center items-center h-full text-slate-500 dark:text-gray-500">
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                Loading chat...
+          <div
+            className="flex-1 overflow-y-auto bg-gradient-to-b from-white/80 to-indigo-50 dark:from-gray-900/80 dark:to-gray-950 
+                scroll-pb-28 sm:scroll-pb-32 scrollbar-thin"
+          >
+            {loadingSession ? (
+              <div className="flex justify-center items-center h-full text-slate-500 dark:text-gray-500">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                  Loading chat...
+                </div>
               </div>
-            </div>
-          ) : messages.length === 0 ? (
-            <div className="flex items-center justify-center h-full px-4 sm:px-6">
-              <EmptyState
-                icon={<MessageSquare className="w-8 h-8 text-white" />}
-                title="Ready to Optimize"
-                description="Enter a prompt below and let AI transform it into a high-performance instruction."
-                className="max-w-md"
-              />
-            </div>
-          ) : (
-            <div className="p-3 sm:p-4 space-y-4 sm:space-y-6">
-              {messages.map((m, i) => (
-                <div
-                  key={`${m.role}-${i}`}
-                  className={`flex gap-3 px-2 sm:px-4 py-2 animate-slide-in ${
-                    m.role === "user" ? "justify-end" : "justify-start"
-                  }`}
-                >
-                  {m.role === "assistant" && (
+            ) : messages.length === 0 ? (
+              <div className="flex items-center justify-center h-full px-4 sm:px-6">
+                <EmptyState
+                  icon={<MessageSquare className="w-8 h-8 text-white" />}
+                  title="Ready to Optimize"
+                  description="Enter a prompt below and let AI transform it into a high-performance instruction."
+                  className="max-w-md"
+                />
+              </div>
+            ) : (
+              <div className="p-2 sm:p-3 space-y-3 sm:space-y-4">
+                {messages.map((m, i) => (
+                  <div
+                    key={`${m.role}-${i}`}
+                    className={`flex gap-2 px-2 sm:px-3 py-1.5 animate-slide-in ${
+                      m.role === "user" ? "justify-end" : "justify-start"
+                    }`}
+                  >
+                    {m.role === "assistant" && (
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-md">
+                        <Cpu className="w-4 h-4 text-white" />
+                      </div>
+                    )}
+                    <div
+                      className={`max-w-[85%] sm:max-w-[80%] rounded-xl px-3 sm:px-3 py-2.5 shadow-lg transition-all duration-300 hover:shadow-xl ${
+                        m.role === "user"
+                          ? "bg-gradient-to-br from-blue-600 to-indigo-700 text-white"
+                          : "bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700"
+                      }`}
+                    >
+                      <div className="text-sm leading-relaxed break-words">
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            p: (props: ComponentProps<"p">) => (
+                              <p className="mb-2" {...props} />
+                            ),
+                            ul: (props: ComponentProps<"ul">) => (
+                              <ul
+                                className="list-disc pl-5 my-2 space-y-1"
+                                {...props}
+                              />
+                            ),
+                            ol: (props: ComponentProps<"ol">) => (
+                              <ol
+                                className="list-decimal pl-5 my-2 space-y-1"
+                                {...props}
+                              />
+                            ),
+                            li: (props: ComponentProps<"li">) => (
+                              <li
+                                className="marker:text-slate-400 dark:marker:text-gray-500"
+                                {...props}
+                              />
+                            ),
+                            a: (props: ComponentProps<"a">) => (
+                              <a
+                                className="text-blue-600 dark:text-blue-400 hover:underline break-all"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                {...props}
+                              />
+                            ),
+                            code: (
+                              props: ComponentProps<"code"> & {
+                                inline?: boolean;
+                              }
+                            ) => {
+                              if (props.inline) {
+                                return (
+                                  <code
+                                    className="px-1 py-0.5 rounded bg-slate-100 dark:bg-gray-700 text-[0.85em]"
+                                    {...props}
+                                  />
+                                );
+                              }
+                              return (
+                                <pre className="my-3">
+                                  <code
+                                    className="block p-3 rounded-lg bg-slate-950/90 text-slate-50 overflow-x-auto text-[0.85em]"
+                                    {...props}
+                                  />
+                                </pre>
+                              );
+                            },
+                            h1: (props: ComponentProps<"h1">) => (
+                              <h1
+                                className="text-lg font-semibold mt-2 mb-2"
+                                {...props}
+                              />
+                            ),
+                            h2: (props: ComponentProps<"h2">) => (
+                              <h2
+                                className="text-base font-semibold mt-2 mb-2"
+                                {...props}
+                              />
+                            ),
+                            h3: (props: ComponentProps<"h3">) => (
+                              <h3
+                                className="text-sm font-semibold mt-2 mb-1"
+                                {...props}
+                              />
+                            ),
+                            blockquote: (
+                              props: ComponentProps<"blockquote">
+                            ) => (
+                              <blockquote
+                                className="border-l-4 border-slate-300 dark:border-gray-600 pl-3 my-2 text-slate-700 dark:text-gray-300"
+                                {...props}
+                              />
+                            ),
+                          }}
+                        >
+                          {m.content}
+                        </ReactMarkdown>
+                      </div>
+                      {m.role === "assistant" && (
+                        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-200 dark:border-gray-700">
+                          <button
+                            onClick={() =>
+                              copyToClipboard(m.content, `msg-${i}`)
+                            }
+                            className="flex items-center gap-1.5 px-2 py-1 text-xs text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-gray-200 hover:bg-slate-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-200"
+                          >
+                            {copied[`msg-${i}`] ? (
+                              <CheckCircle className="w-3 h-3" />
+                            ) : (
+                              <Copy className="w-3 h-3" />
+                            )}
+                            {copied[`msg-${i}`] ? "Copied" : "Copy"}
+                          </button>
+                        </div>
+                      )}
+                      {m.explanations && m.explanations.length > 0 && (
+                        <div className="mt-4 pt-3 border-t border-slate-200 dark:border-gray-700">
+                          <h4 className="text-xs font-semibold text-slate-600 dark:text-gray-400 mb-2">
+                            IMPROVEMENTS MADE:
+                          </h4>
+                          <ul className="space-y-1.5">
+                            {m.explanations.map((ex, idx) => (
+                              <li
+                                key={idx}
+                                className="flex items-start gap-2 text-xs text-slate-700 dark:text-gray-300"
+                              >
+                                <CheckCircle className="w-3 h-3 text-green-500 mt-0.5 flex-shrink-0" />
+                                <span>{ex}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {m.suggestions && m.suggestions.length > 0 && (
+                        <div className="mt-4 pt-3 border-t border-slate-200 dark:border-gray-700">
+                          <h4 className="text-xs font-semibold text-slate-600 dark:text-gray-400 mb-2">
+                            SUGGESTED NEXT STEPS:
+                          </h4>
+                          <div className="flex flex-wrap gap-2">
+                            {m.suggestions.map((s, idx) => (
+                              <button
+                                key={idx}
+                                onClick={() => handleSuggestionClick(s)}
+                                disabled={isClarifying}
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-full border border-slate-200 dark:border-gray-700 bg-slate-50 dark:bg-gray-800 text-slate-700 dark:text-gray-300 transition-colors ${
+                                  isClarifying
+                                    ? "opacity-60 cursor-not-allowed"
+                                    : "hover:bg-slate-100 dark:hover:bg-gray-700"
+                                }`}
+                              >
+                                <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
+                                <span className="line-clamp-1 max-w-[220px] sm:max-w-[300px] text-left">
+                                  {s}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    {m.role === "user" && (
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center flex-shrink-0 shadow-md">
+                        <User className="w-4 h-4 text-white" />
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {isLoading && (
+                  <div className="flex gap-3">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+                      <Cpu className="w-4 h-4 text-white" />
+                    </div>
+                    <div className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-2xl px-4 py-3 w-full max-w-[80%]">
+                      <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-gray-400 mb-2">
+                        <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                        Optimizing your prompt...
+                      </div>
+                      <div className="space-y-2 animate-pulse">
+                        <div className="h-3 bg-slate-200 dark:bg-gray-700 rounded w-3/5"></div>
+                        <div className="h-3 bg-slate-200 dark:bg-gray-700 rounded w-11/12"></div>
+                        <div className="h-3 bg-slate-200 dark:bg-gray-700 rounded w-2/3"></div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {isClarifying && !qaActive && (
+                  <div className="flex gap-3 px-2 sm:px-4 py-2">
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-md">
                       <Cpu className="w-4 h-4 text-white" />
                     </div>
-                  )}
-                  <div
-                    className={`max-w-[85%] sm:max-w-[80%] rounded-2xl px-3 sm:px-4 py-3 shadow-lg transition-all duration-300 hover:shadow-xl ${
-                      m.role === "user"
-                        ? "bg-gradient-to-br from-blue-600 to-indigo-700 text-white"
-                        : "bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700"
-                    }`}
-                  >
-                    <div className="text-sm leading-relaxed break-words">
-                      <ReactMarkdown
-                        remarkPlugins={[remarkGfm]}
-                        components={{
-                          p: (props: ComponentProps<"p">) => (
-                            <p className="mb-2" {...props} />
-                          ),
-                          ul: (props: ComponentProps<"ul">) => (
-                            <ul className="list-disc pl-5 my-2 space-y-1" {...props} />
-                          ),
-                          ol: (props: ComponentProps<"ol">) => (
-                            <ol className="list-decimal pl-5 my-2 space-y-1" {...props} />
-                          ),
-                          li: (props: ComponentProps<"li">) => (
-                            <li
-                              className="marker:text-slate-400 dark:marker:text-gray-500"
-                              {...props}
-                            />
-                          ),
-                          a: (props: ComponentProps<"a">) => (
-                            <a
-                              className="text-blue-600 dark:text-blue-400 hover:underline break-all"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              {...props}
-                            />
-                          ),
-                          code: (
-                            props: ComponentProps<"code"> & { inline?: boolean }
-                          ) => {
-                            if (props.inline) {
-                              return (
-                                <code
-                                  className="px-1 py-0.5 rounded bg-slate-100 dark:bg-gray-700 text-[0.85em]"
-                                  {...props}
-                                />
-                              );
-                            }
-                            return (
-                              <pre className="my-3">
-                                <code
-                                  className="block p-3 rounded-lg bg-slate-950/90 text-slate-50 overflow-x-auto text-[0.85em]"
-                                  {...props}
-                                />
-                              </pre>
-                            );
-                          },
-                          h1: (props: ComponentProps<"h1">) => (
-                            <h1 className="text-lg font-semibold mt-2 mb-2" {...props} />
-                          ),
-                          h2: (props: ComponentProps<"h2">) => (
-                            <h2 className="text-base font-semibold mt-2 mb-2" {...props} />
-                          ),
-                          h3: (props: ComponentProps<"h3">) => (
-                            <h3 className="text-sm font-semibold mt-2 mb-1" {...props} />
-                          ),
-                          blockquote: (props: ComponentProps<"blockquote">) => (
-                            <blockquote
-                              className="border-l-4 border-slate-300 dark:border-gray-600 pl-3 my-2 text-slate-700 dark:text-gray-300"
-                              {...props}
-                            />
-                          ),
-                        }}
-                      >
-                        {m.content}
-                      </ReactMarkdown>
+                    <div className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-2xl px-4 py-3 w-full max-w-[80%]">
+                      <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-gray-400 mb-2">
+                        <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                        Preparing clarifying questions...
+                      </div>
+                      <div className="space-y-3 animate-pulse">
+                        <div className="h-3 bg-slate-200 dark:bg-gray-700 rounded w-2/3"></div>
+                        <div className="h-3 bg-slate-200 dark:bg-gray-700 rounded w-3/4"></div>
+                        <div className="h-3 bg-slate-200 dark:bg-gray-700 rounded w-1/2"></div>
+                      </div>
                     </div>
-                    {m.role === "assistant" && (
-                      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-200 dark:border-gray-700">
+                  </div>
+                )}
+                {qaActive && (
+                  <div className="flex gap-3 px-2 sm:px-4 py-2">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-md">
+                      <Cpu className="w-4 h-4 text-white" />
+                    </div>
+                    <div className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-2xl px-4 py-3 w-full max-w-[80%]">
+                      <h4 className="text-xs font-semibold text-slate-600 dark:text-gray-400 mb-2">
+                        Clarifying questions
+                        {qaSuggestion ? ` for: "${qaSuggestion}"` : ""}
+                      </h4>
+                      <div className="space-y-3">
+                        {qaQuestions.map((q, idx) => (
+                          <div key={idx} className="space-y-1">
+                            <div className="text-xs text-slate-700 dark:text-gray-300">
+                              {q}
+                            </div>
+                            <input
+                              type="text"
+                              value={qaAnswers[idx] || ""}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setQaAnswers((prev) => {
+                                  const next = [...prev];
+                                  next[idx] = val;
+                                  return next;
+                                });
+                              }}
+                              className="w-full rounded-md border border-slate-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                              placeholder="Your answer"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-2 mt-3">
                         <button
-                          onClick={() => copyToClipboard(m.content, `msg-${i}`)}
-                          className="flex items-center gap-1.5 px-2 py-1 text-xs text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-gray-200 hover:bg-slate-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-200"
+                          disabled={
+                            isRefiningWithAnswers || qaQuestions.length === 0
+                          }
+                          onClick={() => handleRefineFromQA()}
+                          className="px-3 py-1.5 text-xs font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:from-blue-700 hover:to-indigo-800 transition-colors"
                         >
-                          {copied[`msg-${i}`] ? (
-                            <CheckCircle className="w-3 h-3" />
-                          ) : (
-                            <Copy className="w-3 h-3" />
-                          )}
-                          {copied[`msg-${i}`] ? "Copied" : "Copy"}
+                          {isRefiningWithAnswers ? "Refining..." : "Refine Now"}
+                        </button>
+                        <button
+                          disabled={isRefiningWithAnswers}
+                          onClick={() => {
+                            setQaActive(false);
+                            setQaQuestions([]);
+                            setQaAnswers([]);
+                            setQaSuggestion(undefined);
+                            // Clear coaching state from localStorage when user cancels
+                            clearCoachingState(sessionId);
+                          }}
+                          className="px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-gray-300 bg-slate-100 dark:bg-gray-700 rounded-lg hover:bg-slate-200 dark:hover:bg-gray-600 transition-colors"
+                        >
+                          Cancel
                         </button>
                       </div>
-                    )}
-                    {m.explanations && m.explanations.length > 0 && (
-                      <div className="mt-4 pt-3 border-t border-slate-200 dark:border-gray-700">
-                        <h4 className="text-xs font-semibold text-slate-600 dark:text-gray-400 mb-2">
-                          IMPROVEMENTS MADE:
-                        </h4>
-                        <ul className="space-y-1.5">
-                          {m.explanations.map((ex, idx) => (
-                            <li
-                              key={idx}
-                              className="flex items-start gap-2 text-xs text-slate-700 dark:text-gray-300"
-                            >
-                              <CheckCircle className="w-3 h-3 text-green-500 mt-0.5 flex-shrink-0" />
-                              <span>{ex}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {m.suggestions && m.suggestions.length > 0 && (
-                      <div className="mt-4 pt-3 border-t border-slate-200 dark:border-gray-700">
-                        <h4 className="text-xs font-semibold text-slate-600 dark:text-gray-400 mb-2">
-                          SUGGESTED NEXT STEPS:
-                        </h4>
-                        <div className="flex flex-wrap gap-2">
-                          {m.suggestions.map((s, idx) => (
-                            <button
-                              key={idx}
-                              onClick={() => handleSuggestionClick(s)}
-                              disabled={isClarifying}
-                              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-full border border-slate-200 dark:border-gray-700 bg-slate-50 dark:bg-gray-800 text-slate-700 dark:text-gray-300 transition-colors ${
-                                isClarifying
-                                  ? "opacity-60 cursor-not-allowed"
-                                  : "hover:bg-slate-100 dark:hover:bg-gray-700"
-                              }`}
-                            >
-                              <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
-                              <span className="line-clamp-1 max-w-[220px] sm:max-w-[300px] text-left">{s}</span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  {m.role === "user" && (
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center flex-shrink-0 shadow-md">
-                      <User className="w-4 h-4 text-white" />
-                    </div>
-                  )}
-                </div>
-              ))}
-              {isLoading && (
-                <div className="flex gap-3">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
-                    <Cpu className="w-4 h-4 text-white" />
-                  </div>
-                  <div className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-2xl px-4 py-3 w-full max-w-[80%]">
-                    <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-gray-400 mb-2">
-                      <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                      Optimizing your prompt...
-                    </div>
-                    <div className="space-y-2 animate-pulse">
-                      <div className="h-3 bg-slate-200 dark:bg-gray-700 rounded w-3/5"></div>
-                      <div className="h-3 bg-slate-200 dark:bg-gray-700 rounded w-11/12"></div>
-                      <div className="h-3 bg-slate-200 dark:bg-gray-700 rounded w-2/3"></div>
                     </div>
                   </div>
-                </div>
-              )}
-              {isClarifying && !qaActive && (
-                <div className="flex gap-3 px-2 sm:px-4 py-2">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-md">
-                    <Cpu className="w-4 h-4 text-white" />
-                  </div>
-                  <div className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-2xl px-4 py-3 w-full max-w-[80%]">
-                    <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-gray-400 mb-2">
-                      <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                      Preparing clarifying questions...
-                    </div>
-                    <div className="space-y-3 animate-pulse">
-                      <div className="h-3 bg-slate-200 dark:bg-gray-700 rounded w-2/3"></div>
-                      <div className="h-3 bg-slate-200 dark:bg-gray-700 rounded w-3/4"></div>
-                      <div className="h-3 bg-slate-200 dark:bg-gray-700 rounded w-1/2"></div>
-                    </div>
-                  </div>
-                </div>
-              )}
-              {qaActive && (
-                <div className="flex gap-3 px-2 sm:px-4 py-2">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-md">
-                    <Cpu className="w-4 h-4 text-white" />
-                  </div>
-                  <div className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-2xl px-4 py-3 w-full max-w-[80%]">
-                    <h4 className="text-xs font-semibold text-slate-600 dark:text-gray-400 mb-2">
-                      Clarifying questions{qaSuggestion ? ` for: "${qaSuggestion}"` : ""}
-                    </h4>
-                    <div className="space-y-3">
-                      {qaQuestions.map((q, idx) => (
-                        <div key={idx} className="space-y-1">
-                          <div className="text-xs text-slate-700 dark:text-gray-300">{q}</div>
-                          <input
-                            type="text"
-                            value={qaAnswers[idx] || ""}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setQaAnswers((prev) => {
-                                const next = [...prev];
-                                next[idx] = val;
-                                return next;
-                              });
-                            }}
-                            className="w-full rounded-md border border-slate-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                            placeholder="Your answer"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                    <div className="flex items-center gap-2 mt-3">
-                      <button
-                        disabled={isRefiningWithAnswers || qaQuestions.length === 0}
-                        onClick={() => handleRefineFromQA()}
-                        className="px-3 py-1.5 text-xs font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:from-blue-700 hover:to-indigo-800 transition-colors"
-                      >
-                        {isRefiningWithAnswers ? "Refining..." : "Refine Now"}
-                      </button>
-                      <button
-                        disabled={isRefiningWithAnswers}
-                        onClick={() => {
-                          setQaActive(false);
-                          setQaQuestions([]);
-                          setQaAnswers([]);
-                          setQaSuggestion(undefined);
-                          // Clear coaching state from localStorage when user cancels
-                          clearCoachingState(sessionId);
-                        }}
-                        className="px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-gray-300 bg-slate-100 dark:bg-gray-700 rounded-lg hover:bg-slate-200 dark:hover:bg-gray-600 transition-colors"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-              <div ref={chatEndRef} />
-            </div>
-          )}
-        </div>
-
-        {latestOptimizedPrompt && (
-          <div className="p-4 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-t border-slate-200/50 dark:border-gray-800/50 shadow-md">
-            <div className="flex gap-2">
-              <button
-                onClick={() => copyToClipboard(latestOptimizedPrompt, "latest")}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 dark:text-gray-300 bg-slate-100 dark:bg-gray-800 rounded-lg hover:bg-slate-200 dark:hover:bg-gray-700 transition-all duration-200 transform hover:scale-105"
-              >
-                {copied["latest"] ? (
-                  <CheckCircle className="w-4 h-4" />
-                ) : (
-                  <Copy className="w-4 h-4" />
                 )}
-                Copy Latest
-              </button>
-              <button
-                onClick={startNewOptimization}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-700 rounded-lg hover:from-blue-700 hover:to-indigo-800 transition-all duration-200 transform hover:scale-105"
-              >
-                <RefreshCw className="w-4 h-4" />
-                New Chat
-              </button>
-            </div>
+                <div ref={chatEndRef} />
+              </div>
+            )}
           </div>
-        )}
 
-        <form
-          onSubmit={handleSend}
-          className="sticky bottom-0 z-30 p-3 sm:p-4 bg-white/90 dark:bg-gray-900/90 backdrop-blur border-t border-slate-200/50 dark:border-gray-800/50 shadow-md pb-[calc(env(safe-area-inset-bottom)+0.5rem)]"
-        >
-          <div className="flex gap-3">
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={
-                messages.length === 0
-                  ? "Enter a prompt to optimize..."
-                  : "Ask for refinements or enter a new prompt..."
-              }
-              className="flex-1 resize-none rounded-xl border border-slate-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 sm:px-4 py-3 text-sm 
-                       focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent
-                       placeholder:text-slate-500 dark:placeholder:text-gray-500 transition-all duration-200"
-              rows={1}
-              disabled={!isApiKeyValid}
-              aria-label="Prompt input"
-            />
-            <button
-              type="submit"
-              disabled={isLoading || !input.trim() || !isApiKeyValid}
-              className="px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-xl hover:from-blue-700 hover:to-indigo-800 
-                       disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-105
-                       flex items-center gap-2 font-medium"
-              aria-label="Send prompt"
-            >
-              <Send className="w-4 h-4" />
-              <span className="hidden sm:inline">Send</span>
-            </button>
-          </div>
-          {!isApiKeyValid && (
-            <div className="mt-2 text-xs text-amber-600 dark:text-amber-400">
-              API key required. Visit Settings to configure.
+          {latestOptimizedPrompt && (
+            <div className="p-3 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-t border-slate-200/50 dark:border-gray-800/50 shadow-md">
+              <div className="flex gap-2">
+                <button
+                  onClick={() =>
+                    copyToClipboard(latestOptimizedPrompt, "latest")
+                  }
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 dark:text-gray-300 bg-slate-100 dark:bg-gray-800 rounded-lg hover:bg-slate-200 dark:hover:bg-gray-700 transition-all duration-200 transform hover:scale-105"
+                >
+                  {copied["latest"] ? (
+                    <CheckCircle className="w-4 h-4" />
+                  ) : (
+                    <Copy className="w-4 h-4" />
+                  )}
+                  Copy Latest
+                </button>
+                <button
+                  onClick={startNewOptimization}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-700 rounded-lg hover:from-blue-700 hover:to-indigo-800 transition-all duration-200 transform hover:scale-105"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  New Chat
+                </button>
+              </div>
             </div>
           )}
-        </form>
-      </main>
+
+          <form
+            onSubmit={handleSend}
+            className="sticky bottom-0 z-30 p-2 sm:p-3 bg-white/90 dark:bg-gray-900/90 backdrop-blur border-t border-slate-200/50 dark:border-gray-800/50 shadow-md pb-[calc(env(safe-area-inset-bottom)+0.5rem)]"
+          >
+            <div className="flex gap-2">
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={
+                  messages.length === 0
+                    ? "Enter a prompt to optimize..."
+                    : "Ask for refinements..."
+                }
+                className="flex-1 resize-none rounded-xl border border-slate-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 sm:px-3 py-2.5 text-sm 
+                         focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent
+                         placeholder:text-slate-500 dark:placeholder:text-gray-500 transition-all duration-200"
+                rows={1}
+                disabled={!isApiKeyValid}
+                aria-label="Prompt input"
+              />
+              <button
+                type="submit"
+                disabled={isLoading || !input.trim() || !isApiKeyValid}
+                className="px-3 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-xl hover:from-blue-700 hover:to-indigo-800 
+                         disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-105
+                         flex items-center gap-2 font-medium"
+                aria-label="Send prompt"
+              >
+                <Send className="w-4 h-4" />
+                <span className="hidden sm:inline">Send</span>
+              </button>
+            </div>
+            {!isApiKeyValid && (
+              <div className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+                API key required. Visit Settings to configure.
+              </div>
+            )}
+          </form>
+        </main>
+      </div>
     </div>
   );
 }
