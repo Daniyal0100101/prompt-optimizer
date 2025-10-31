@@ -242,11 +242,26 @@ export default function Home() {
   );
 
   const quickPrompts = [
-    "Explain this concept simply",
-    "Summarize this article",
-    "Generate a report on market trends",
-    "Write a persuasive email",
-    "Create a funny tweet about AI",
+    {
+      title: "Explain this concept simply",
+      instructions: "Please provide a clear and concise explanation of this concept in simple terms that a beginner could understand. Break down any complex ideas into easy-to-digest parts and include relevant examples or analogies to help illustrate the concept."
+    },
+    {
+      title: "Summarize this article",
+      instructions: "Please provide a comprehensive summary of this article. Include the main points, key arguments, and any important supporting details. The summary should be concise yet thorough enough to give someone who hasn't read the article a good understanding of its content."
+    },
+    {
+      title: "Generate a report on market trends",
+      instructions: "Create a detailed market trends report analyzing current developments in the industry. Include key statistics, emerging patterns, competitive landscape, and future projections. Organize the information with clear sections and provide actionable insights."
+    },
+    {
+      title: "Write a persuasive email",
+      instructions: "Compose a compelling and professional email that effectively communicates the key message and encourages the recipient to take the desired action. Use persuasive language, highlight benefits, and include a clear call-to-action. Maintain a professional yet engaging tone throughout."
+    },
+    {
+      title: "Create a funny tweet about AI",
+      instructions: "Generate a humorous and engaging tweet about artificial intelligence that would resonate with a tech-savvy audience. The tweet should be witty, original, and no more than 280 characters. Include relevant hashtags if appropriate."
+    }
   ];
 
   return (
@@ -298,7 +313,7 @@ export default function Home() {
           </div>
         </header>
 
-        <form onSubmit={handleStartFromHome} className="relative mb-12">
+        <form onSubmit={handleStartFromHome} className="relative mb-12 animate-fade-in">
           {!hasKey && (
             <div className="absolute -top-3 left-6 z-30 px-3 py-1.5 bg-gradient-to-r from-amber-500/95 to-orange-500/95 dark:from-amber-600/95 dark:to-orange-600/95 text-white text-xs font-semibold rounded-full shadow-lg backdrop-blur-sm border border-white/20">
               <span className="relative flex h-2 w-2 mr-2">

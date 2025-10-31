@@ -785,49 +785,77 @@ export default function PromptOptimizer({
     );
   };
 
+  // Prevent body scroll when mobile sidebar is open
+  useEffect(() => {
+    if (isHistoryOpen) {
+      document.body.style.overflow = "hidden";
+      document.documentElement.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+      document.documentElement.style.overflow = "";
+    }
+
+    return () => {
+      document.body.style.overflow = "";
+      document.documentElement.style.overflow = "";
+    };
+  }, [isHistoryOpen]);
+
   return (
     <div className="h-screen overflow-hidden flex bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
       {isHistoryOpen && (
         <div
-          className="fixed inset-0 z-30 bg-black/50 lg:hidden"
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden transition-opacity duration-300"
           onClick={() => setIsHistoryOpen(false)}
           aria-label="Close sidebar overlay"
+          style={{
+            opacity: isHistoryOpen ? 1 : 0,
+            pointerEvents: isHistoryOpen ? "auto" : "none",
+          }}
         />
       )}
 
       <div
-        className={`fixed top-0 left-0 h-[100svh] z-40 transition-transform duration-300 lg:hidden ${
+        className={`fixed top-0 left-0 h-[100svh] z-50 transition-all duration-300 ease-in-out lg:hidden will-change-transform ${
           isHistoryOpen ? "translate-x-0" : "-translate-x-full"
         }`}
+        style={{
+          boxShadow: isHistoryOpen ? "0 0 20px rgba(0, 0, 0, 0.1)" : "none",
+        }}
       >
-        <div className="w-80 h-full pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+        <div className="w-72 sm:w-80 h-full pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] overflow-y-auto overscroll-contain bg-white dark:bg-gray-900">
           <HistoryPanel />
         </div>
       </div>
 
       <div
-        className={`hidden lg:flex h-full transition-all duration-300 overflow-hidden ${
+        className={`hidden lg:flex h-full transition-all duration-300 ease-in-out ${
           isDesktopSidebarCollapsed ? "lg:w-0" : "lg:w-80"
         }`}
         aria-hidden={isDesktopSidebarCollapsed}
       >
         <div
-          className={`${
+          className={`relative w-full h-full ${
             isDesktopSidebarCollapsed
-              ? "opacity-0 pointer-events-none"
+              ? "opacity-0 pointer-events-none -ml-2"
               : "opacity-100"
-          } transition-opacity duration-200 w-full`}
+          } transition-all duration-300 ease-in-out`}
+          style={{
+            boxShadow: isDesktopSidebarCollapsed
+              ? "none"
+              : "4px 0 12px rgba(0, 0, 0, 0.05)",
+          }}
         >
           <HistoryPanel />
         </div>
       </div>
 
       <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
-        <main className="flex-1 flex flex-col min-h-0">
-          <header className="sticky top-0 z-20 flex items-center justify-between p-3 bg-white/90 dark:bg-gray-900/90 backdrop-blur border-b border-slate-200 dark:border-gray-800 shadow-md">
+        <main className="flex-1 flex flex-col min-h-0 max-w-[2000px] w-full mx-auto">
+          <header className="sticky top-0 z-30 flex items-center justify-between p-3 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-b border-slate-200/80 dark:border-gray-800/80 shadow-sm">
             <div className="flex items-center gap-2">
               <button
-                className="lg:hidden p-2 -ml-2 rounded-lg hover:bg-slate-100 dark:hover:bg-gray-800 transition-all duration-200"
+                className="lg:hidden p-2 -ml-2 rounded-lg hover:bg-slate-100 dark:hover:bg-gray-800 transition-all duration-200 active:scale-95 active:bg-slate-200 dark:active:bg-gray-700"
                 onClick={() => setIsHistoryOpen(true)}
                 aria-label="Open sidebar"
               >
@@ -861,300 +889,304 @@ export default function PromptOptimizer({
 
           <div
             className="flex-1 overflow-y-auto bg-gradient-to-b from-white/80 to-indigo-50 dark:from-gray-900/80 dark:to-gray-950 
-                scroll-pb-28 sm:scroll-pb-32 scrollbar-thin"
+                scroll-pb-28 sm:scroll-pb-32 scrollbar-thin px-4 sm:px-6 lg:px-8"
           >
-            {loadingSession ? (
-              <div className="flex justify-center items-center h-full text-slate-500 dark:text-gray-500">
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                  Loading chat...
+            <div className="max-w-4xl mx-auto w-full">
+              {loadingSession ? (
+                <div className="flex justify-center items-center h-full text-slate-500 dark:text-gray-500">
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                    Loading chat...
+                  </div>
                 </div>
-              </div>
-            ) : messages.length === 0 ? (
-              <div className="flex items-center justify-center h-full px-4 sm:px-6">
-                <EmptyState
-                  icon={<MessageSquare className="w-8 h-8 text-white" />}
-                  title="Ready to Optimize"
-                  description="Enter a prompt below and let AI transform it into a high-performance instruction."
-                  className="max-w-md"
-                />
-              </div>
-            ) : (
-              <div className="p-2 sm:p-3 space-y-3 sm:space-y-4">
-                {messages.map((m, i) => (
-                  <div
-                    key={`${m.role}-${i}`}
-                    className={`flex gap-2 px-2 sm:px-3 py-1.5 animate-slide-in ${
-                      m.role === "user" ? "justify-end" : "justify-start"
-                    }`}
-                  >
-                    {m.role === "assistant" && (
+              ) : messages.length === 0 ? (
+                <div className="flex items-center justify-center h-full px-4 sm:px-6">
+                  <EmptyState
+                    icon={<MessageSquare className="w-8 h-8 text-white" />}
+                    title="Ready to Optimize"
+                    description="Enter a prompt below and let AI transform it into a high-performance instruction."
+                    className="max-w-md"
+                  />
+                </div>
+              ) : (
+                <div className="py-2 sm:py-3 space-y-3 sm:space-y-4">
+                  {messages.map((m, i) => (
+                    <div
+                      key={`${m.role}-${i}`}
+                      className={`flex gap-2 px-2 sm:px-3 py-1.5 animate-slide-in ${
+                        m.role === "user" ? "justify-end" : "justify-start"
+                      }`}
+                    >
+                      {m.role === "assistant" && (
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-md">
+                          <Cpu className="w-4 h-4 text-white" />
+                        </div>
+                      )}
+                      <div
+                        className={`max-w-[85%] sm:max-w-[80%] rounded-xl px-3 sm:px-3 py-2.5 shadow-lg transition-all duration-300 hover:shadow-xl ${
+                          m.role === "user"
+                            ? "bg-gradient-to-br from-blue-600 to-indigo-700 text-white"
+                            : "bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700"
+                        }`}
+                      >
+                        <div className="text-sm leading-relaxed break-words">
+                          <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
+                            components={{
+                              p: (props: ComponentProps<"p">) => (
+                                <p className="mb-2" {...props} />
+                              ),
+                              ul: (props: ComponentProps<"ul">) => (
+                                <ul
+                                  className="list-disc pl-5 my-2 space-y-1"
+                                  {...props}
+                                />
+                              ),
+                              ol: (props: ComponentProps<"ol">) => (
+                                <ol
+                                  className="list-decimal pl-5 my-2 space-y-1"
+                                  {...props}
+                                />
+                              ),
+                              li: (props: ComponentProps<"li">) => (
+                                <li
+                                  className="marker:text-slate-400 dark:marker:text-gray-500"
+                                  {...props}
+                                />
+                              ),
+                              a: (props: ComponentProps<"a">) => (
+                                <a
+                                  className="text-blue-600 dark:text-blue-400 hover:underline break-all"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  {...props}
+                                />
+                              ),
+                              code: (
+                                props: ComponentProps<"code"> & {
+                                  inline?: boolean;
+                                }
+                              ) => {
+                                if (props.inline) {
+                                  return (
+                                    <code
+                                      className="px-1 py-0.5 rounded bg-slate-100 dark:bg-gray-700 text-[0.85em]"
+                                      {...props}
+                                    />
+                                  );
+                                }
+                                return (
+                                  <pre className="my-3">
+                                    <code
+                                      className="block p-3 rounded-lg bg-slate-950/90 text-slate-50 overflow-x-auto text-[0.85em]"
+                                      {...props}
+                                    />
+                                  </pre>
+                                );
+                              },
+                              h1: (props: ComponentProps<"h1">) => (
+                                <h1
+                                  className="text-lg font-semibold mt-2 mb-2"
+                                  {...props}
+                                />
+                              ),
+                              h2: (props: ComponentProps<"h2">) => (
+                                <h2
+                                  className="text-base font-semibold mt-2 mb-2"
+                                  {...props}
+                                />
+                              ),
+                              h3: (props: ComponentProps<"h3">) => (
+                                <h3
+                                  className="text-sm font-semibold mt-2 mb-1"
+                                  {...props}
+                                />
+                              ),
+                              blockquote: (
+                                props: ComponentProps<"blockquote">
+                              ) => (
+                                <blockquote
+                                  className="border-l-4 border-slate-300 dark:border-gray-600 pl-3 my-2 text-slate-700 dark:text-gray-300"
+                                  {...props}
+                                />
+                              ),
+                            }}
+                          >
+                            {m.content}
+                          </ReactMarkdown>
+                        </div>
+                        {m.role === "assistant" && (
+                          <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-200 dark:border-gray-700">
+                            <button
+                              onClick={() =>
+                                copyToClipboard(m.content, `msg-${i}`)
+                              }
+                              className="flex items-center gap-1.5 px-2 py-1 text-xs text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-gray-200 hover:bg-slate-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-200"
+                            >
+                              {copied[`msg-${i}`] ? (
+                                <CheckCircle className="w-3 h-3" />
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                              {copied[`msg-${i}`] ? "Copied" : "Copy"}
+                            </button>
+                          </div>
+                        )}
+                        {m.explanations && m.explanations.length > 0 && (
+                          <div className="mt-4 pt-3 border-t border-slate-200 dark:border-gray-700">
+                            <h4 className="text-xs font-semibold text-slate-600 dark:text-gray-400 mb-2">
+                              IMPROVEMENTS MADE:
+                            </h4>
+                            <ul className="space-y-1.5">
+                              {m.explanations.map((ex, idx) => (
+                                <li
+                                  key={idx}
+                                  className="flex items-start gap-2 text-xs text-slate-700 dark:text-gray-300"
+                                >
+                                  <CheckCircle className="w-3 h-3 text-green-500 mt-0.5 flex-shrink-0" />
+                                  <span>{ex}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {m.suggestions && m.suggestions.length > 0 && (
+                          <div className="mt-4 pt-3 border-t border-slate-200 dark:border-gray-700">
+                            <h4 className="text-xs font-semibold text-slate-600 dark:text-gray-400 mb-2">
+                              SUGGESTED NEXT STEPS:
+                            </h4>
+                            <div className="flex flex-wrap gap-2">
+                              {m.suggestions.map((s, idx) => (
+                                <button
+                                  key={idx}
+                                  onClick={() => handleSuggestionClick(s)}
+                                  disabled={isClarifying}
+                                  className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-full border border-slate-200 dark:border-gray-700 bg-slate-50 dark:bg-gray-800 text-slate-700 dark:text-gray-300 transition-colors ${
+                                    isClarifying
+                                      ? "opacity-60 cursor-not-allowed"
+                                      : "hover:bg-slate-100 dark:hover:bg-gray-700"
+                                  }`}
+                                >
+                                  <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
+                                  <span className="line-clamp-1 max-w-[220px] sm:max-w-[300px] text-left">
+                                    {s}
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      {m.role === "user" && (
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center flex-shrink-0 shadow-md">
+                          <User className="w-4 h-4 text-white" />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {isLoading && (
+                    <div className="flex gap-3">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+                        <Cpu className="w-4 h-4 text-white" />
+                      </div>
+                      <div className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-2xl px-4 py-3 w-full max-w-[80%]">
+                        <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-gray-400 mb-2">
+                          <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                          Optimizing your prompt...
+                        </div>
+                        <div className="space-y-2 animate-pulse">
+                          <div className="h-3 bg-slate-200 dark:bg-gray-700 rounded w-3/5"></div>
+                          <div className="h-3 bg-slate-200 dark:bg-gray-700 rounded w-11/12"></div>
+                          <div className="h-3 bg-slate-200 dark:bg-gray-700 rounded w-2/3"></div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {isClarifying && !qaActive && (
+                    <div className="flex gap-3 px-2 sm:px-4 py-2">
                       <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-md">
                         <Cpu className="w-4 h-4 text-white" />
                       </div>
-                    )}
-                    <div
-                      className={`max-w-[85%] sm:max-w-[80%] rounded-xl px-3 sm:px-3 py-2.5 shadow-lg transition-all duration-300 hover:shadow-xl ${
-                        m.role === "user"
-                          ? "bg-gradient-to-br from-blue-600 to-indigo-700 text-white"
-                          : "bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700"
-                      }`}
-                    >
-                      <div className="text-sm leading-relaxed break-words">
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm]}
-                          components={{
-                            p: (props: ComponentProps<"p">) => (
-                              <p className="mb-2" {...props} />
-                            ),
-                            ul: (props: ComponentProps<"ul">) => (
-                              <ul
-                                className="list-disc pl-5 my-2 space-y-1"
-                                {...props}
-                              />
-                            ),
-                            ol: (props: ComponentProps<"ol">) => (
-                              <ol
-                                className="list-decimal pl-5 my-2 space-y-1"
-                                {...props}
-                              />
-                            ),
-                            li: (props: ComponentProps<"li">) => (
-                              <li
-                                className="marker:text-slate-400 dark:marker:text-gray-500"
-                                {...props}
-                              />
-                            ),
-                            a: (props: ComponentProps<"a">) => (
-                              <a
-                                className="text-blue-600 dark:text-blue-400 hover:underline break-all"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                {...props}
-                              />
-                            ),
-                            code: (
-                              props: ComponentProps<"code"> & {
-                                inline?: boolean;
-                              }
-                            ) => {
-                              if (props.inline) {
-                                return (
-                                  <code
-                                    className="px-1 py-0.5 rounded bg-slate-100 dark:bg-gray-700 text-[0.85em]"
-                                    {...props}
-                                  />
-                                );
-                              }
-                              return (
-                                <pre className="my-3">
-                                  <code
-                                    className="block p-3 rounded-lg bg-slate-950/90 text-slate-50 overflow-x-auto text-[0.85em]"
-                                    {...props}
-                                  />
-                                </pre>
-                              );
-                            },
-                            h1: (props: ComponentProps<"h1">) => (
-                              <h1
-                                className="text-lg font-semibold mt-2 mb-2"
-                                {...props}
-                              />
-                            ),
-                            h2: (props: ComponentProps<"h2">) => (
-                              <h2
-                                className="text-base font-semibold mt-2 mb-2"
-                                {...props}
-                              />
-                            ),
-                            h3: (props: ComponentProps<"h3">) => (
-                              <h3
-                                className="text-sm font-semibold mt-2 mb-1"
-                                {...props}
-                              />
-                            ),
-                            blockquote: (
-                              props: ComponentProps<"blockquote">
-                            ) => (
-                              <blockquote
-                                className="border-l-4 border-slate-300 dark:border-gray-600 pl-3 my-2 text-slate-700 dark:text-gray-300"
-                                {...props}
-                              />
-                            ),
-                          }}
-                        >
-                          {m.content}
-                        </ReactMarkdown>
+                      <div className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-2xl px-4 py-3 w-full max-w-[80%]">
+                        <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-gray-400 mb-2">
+                          <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                          Preparing clarifying questions...
+                        </div>
+                        <div className="space-y-3 animate-pulse">
+                          <div className="h-3 bg-slate-200 dark:bg-gray-700 rounded w-2/3"></div>
+                          <div className="h-3 bg-slate-200 dark:bg-gray-700 rounded w-3/4"></div>
+                          <div className="h-3 bg-slate-200 dark:bg-gray-700 rounded w-1/2"></div>
+                        </div>
                       </div>
-                      {m.role === "assistant" && (
-                        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-200 dark:border-gray-700">
+                    </div>
+                  )}
+                  {qaActive && (
+                    <div className="flex gap-3 px-2 sm:px-4 py-2">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-md">
+                        <Cpu className="w-4 h-4 text-white" />
+                      </div>
+                      <div className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-2xl px-4 py-3 w-full max-w-[80%]">
+                        <h4 className="text-xs font-semibold text-slate-600 dark:text-gray-400 mb-2">
+                          Clarifying questions
+                          {qaSuggestion ? ` for: "${qaSuggestion}"` : ""}
+                        </h4>
+                        <div className="space-y-3">
+                          {qaQuestions.map((q, idx) => (
+                            <div key={idx} className="space-y-1">
+                              <div className="text-xs text-slate-700 dark:text-gray-300">
+                                {q}
+                              </div>
+                              <input
+                                type="text"
+                                value={qaAnswers[idx] || ""}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setQaAnswers((prev) => {
+                                    const next = [...prev];
+                                    next[idx] = val;
+                                    return next;
+                                  });
+                                }}
+                                className="w-full rounded-md border border-slate-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                placeholder="Your answer"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex items-center gap-2 mt-3">
                           <button
-                            onClick={() =>
-                              copyToClipboard(m.content, `msg-${i}`)
+                            disabled={
+                              isRefiningWithAnswers || qaQuestions.length === 0
                             }
-                            className="flex items-center gap-1.5 px-2 py-1 text-xs text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-gray-200 hover:bg-slate-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-200"
+                            onClick={() => handleRefineFromQA()}
+                            className="px-3 py-1.5 text-xs font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:from-blue-700 hover:to-indigo-800 transition-colors"
                           >
-                            {copied[`msg-${i}`] ? (
-                              <CheckCircle className="w-3 h-3" />
-                            ) : (
-                              <Copy className="w-3 h-3" />
-                            )}
-                            {copied[`msg-${i}`] ? "Copied" : "Copy"}
+                            {isRefiningWithAnswers
+                              ? "Refining..."
+                              : "Refine Now"}
+                          </button>
+                          <button
+                            disabled={isRefiningWithAnswers}
+                            onClick={() => {
+                              setQaActive(false);
+                              setQaQuestions([]);
+                              setQaAnswers([]);
+                              setQaSuggestion(undefined);
+                              // Clear coaching state from localStorage when user cancels
+                              clearCoachingState(sessionId);
+                            }}
+                            className="px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-gray-300 bg-slate-100 dark:bg-gray-700 rounded-lg hover:bg-slate-200 dark:hover:bg-gray-600 transition-colors"
+                          >
+                            Cancel
                           </button>
                         </div>
-                      )}
-                      {m.explanations && m.explanations.length > 0 && (
-                        <div className="mt-4 pt-3 border-t border-slate-200 dark:border-gray-700">
-                          <h4 className="text-xs font-semibold text-slate-600 dark:text-gray-400 mb-2">
-                            IMPROVEMENTS MADE:
-                          </h4>
-                          <ul className="space-y-1.5">
-                            {m.explanations.map((ex, idx) => (
-                              <li
-                                key={idx}
-                                className="flex items-start gap-2 text-xs text-slate-700 dark:text-gray-300"
-                              >
-                                <CheckCircle className="w-3 h-3 text-green-500 mt-0.5 flex-shrink-0" />
-                                <span>{ex}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                      {m.suggestions && m.suggestions.length > 0 && (
-                        <div className="mt-4 pt-3 border-t border-slate-200 dark:border-gray-700">
-                          <h4 className="text-xs font-semibold text-slate-600 dark:text-gray-400 mb-2">
-                            SUGGESTED NEXT STEPS:
-                          </h4>
-                          <div className="flex flex-wrap gap-2">
-                            {m.suggestions.map((s, idx) => (
-                              <button
-                                key={idx}
-                                onClick={() => handleSuggestionClick(s)}
-                                disabled={isClarifying}
-                                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-full border border-slate-200 dark:border-gray-700 bg-slate-50 dark:bg-gray-800 text-slate-700 dark:text-gray-300 transition-colors ${
-                                  isClarifying
-                                    ? "opacity-60 cursor-not-allowed"
-                                    : "hover:bg-slate-100 dark:hover:bg-gray-700"
-                                }`}
-                              >
-                                <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
-                                <span className="line-clamp-1 max-w-[220px] sm:max-w-[300px] text-left">
-                                  {s}
-                                </span>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    {m.role === "user" && (
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center flex-shrink-0 shadow-md">
-                        <User className="w-4 h-4 text-white" />
-                      </div>
-                    )}
-                  </div>
-                ))}
-                {isLoading && (
-                  <div className="flex gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
-                      <Cpu className="w-4 h-4 text-white" />
-                    </div>
-                    <div className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-2xl px-4 py-3 w-full max-w-[80%]">
-                      <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-gray-400 mb-2">
-                        <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                        Optimizing your prompt...
-                      </div>
-                      <div className="space-y-2 animate-pulse">
-                        <div className="h-3 bg-slate-200 dark:bg-gray-700 rounded w-3/5"></div>
-                        <div className="h-3 bg-slate-200 dark:bg-gray-700 rounded w-11/12"></div>
-                        <div className="h-3 bg-slate-200 dark:bg-gray-700 rounded w-2/3"></div>
                       </div>
                     </div>
-                  </div>
-                )}
-                {isClarifying && !qaActive && (
-                  <div className="flex gap-3 px-2 sm:px-4 py-2">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-md">
-                      <Cpu className="w-4 h-4 text-white" />
-                    </div>
-                    <div className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-2xl px-4 py-3 w-full max-w-[80%]">
-                      <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-gray-400 mb-2">
-                        <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                        Preparing clarifying questions...
-                      </div>
-                      <div className="space-y-3 animate-pulse">
-                        <div className="h-3 bg-slate-200 dark:bg-gray-700 rounded w-2/3"></div>
-                        <div className="h-3 bg-slate-200 dark:bg-gray-700 rounded w-3/4"></div>
-                        <div className="h-3 bg-slate-200 dark:bg-gray-700 rounded w-1/2"></div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {qaActive && (
-                  <div className="flex gap-3 px-2 sm:px-4 py-2">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-md">
-                      <Cpu className="w-4 h-4 text-white" />
-                    </div>
-                    <div className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-2xl px-4 py-3 w-full max-w-[80%]">
-                      <h4 className="text-xs font-semibold text-slate-600 dark:text-gray-400 mb-2">
-                        Clarifying questions
-                        {qaSuggestion ? ` for: "${qaSuggestion}"` : ""}
-                      </h4>
-                      <div className="space-y-3">
-                        {qaQuestions.map((q, idx) => (
-                          <div key={idx} className="space-y-1">
-                            <div className="text-xs text-slate-700 dark:text-gray-300">
-                              {q}
-                            </div>
-                            <input
-                              type="text"
-                              value={qaAnswers[idx] || ""}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setQaAnswers((prev) => {
-                                  const next = [...prev];
-                                  next[idx] = val;
-                                  return next;
-                                });
-                              }}
-                              className="w-full rounded-md border border-slate-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                              placeholder="Your answer"
-                            />
-                          </div>
-                        ))}
-                      </div>
-                      <div className="flex items-center gap-2 mt-3">
-                        <button
-                          disabled={
-                            isRefiningWithAnswers || qaQuestions.length === 0
-                          }
-                          onClick={() => handleRefineFromQA()}
-                          className="px-3 py-1.5 text-xs font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:from-blue-700 hover:to-indigo-800 transition-colors"
-                        >
-                          {isRefiningWithAnswers ? "Refining..." : "Refine Now"}
-                        </button>
-                        <button
-                          disabled={isRefiningWithAnswers}
-                          onClick={() => {
-                            setQaActive(false);
-                            setQaQuestions([]);
-                            setQaAnswers([]);
-                            setQaSuggestion(undefined);
-                            // Clear coaching state from localStorage when user cancels
-                            clearCoachingState(sessionId);
-                          }}
-                          className="px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-gray-300 bg-slate-100 dark:bg-gray-700 rounded-lg hover:bg-slate-200 dark:hover:bg-gray-600 transition-colors"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                <div ref={chatEndRef} />
-              </div>
-            )}
+                  )}
+                  <div ref={chatEndRef} />
+                </div>
+              )}
+            </div>
           </div>
 
           {latestOptimizedPrompt && (
@@ -1186,7 +1218,7 @@ export default function PromptOptimizer({
 
           <form
             onSubmit={handleSend}
-            className="sticky bottom-0 z-30 p-2 sm:p-3 bg-white/90 dark:bg-gray-900/90 backdrop-blur border-t border-slate-200/50 dark:border-gray-800/50 shadow-md pb-[calc(env(safe-area-inset-bottom)+0.5rem)]"
+            className="sticky bottom-0 z-30 p-2 sm:p-3 bg-white/90 dark:bg-gray-900/90 backdrop-blur border-t border-slate-200/50 dark:border-gray-800/50 shadow-md pb-[calc(env(safe-area-inset-bottom)+0.5rem)] focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent overflow-hidden"
           >
             <div className="flex gap-2">
               <textarea
@@ -1200,7 +1232,7 @@ export default function PromptOptimizer({
                     : "Ask for refinements..."
                 }
                 className="flex-1 resize-none rounded-xl border border-slate-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 sm:px-3 py-2.5 text-sm 
-                         focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent
+                         focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent overflow-y-auto max-h-32
                          placeholder:text-slate-500 dark:placeholder:text-gray-500 transition-all duration-200"
                 rows={1}
                 disabled={!isApiKeyValid}
@@ -1209,9 +1241,9 @@ export default function PromptOptimizer({
               <button
                 type="submit"
                 disabled={isLoading || !input.trim() || !isApiKeyValid}
-                className="px-3 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-xl hover:from-blue-700 hover:to-indigo-800 
+                className="h-[42px] self-end px-3 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-xl hover:from-blue-700 hover:to-indigo-800 
                          disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-105
-                         flex items-center gap-2 font-medium"
+                         flex items-center gap-2 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 aria-label="Send prompt"
               >
                 <Send className="w-4 h-4" />
@@ -1219,7 +1251,7 @@ export default function PromptOptimizer({
               </button>
             </div>
             {!isApiKeyValid && (
-              <div className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+              <div className="mt-2 text-xs text-amber-600 dark:text-amber-400 px-1">
                 API key required. Visit Settings to configure.
               </div>
             )}

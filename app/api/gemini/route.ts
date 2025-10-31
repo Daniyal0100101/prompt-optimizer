@@ -393,11 +393,14 @@ export async function POST(
     // Task-specific validation
     if (task === "clarify") {
       if (!selectedSuggestion) {
-        throw new ApiError("Missing selectedSuggestion for clarify task.", 400);
+        throw new ApiError(
+          "Missing required parameter: 'selectedSuggestion' is required for the clarify task. Please provide a suggestion to clarify.",
+          400
+        );
       }
       if (!prompt) {
         throw new ApiError(
-          "Missing prompt for clarify task. Provide the latest user input as 'prompt'.",
+          "Missing required parameter: 'prompt' is required for the clarify task. Please provide the latest user input as 'prompt'.",
           400
         );
       }

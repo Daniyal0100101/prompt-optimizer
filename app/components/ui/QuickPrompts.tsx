@@ -1,8 +1,13 @@
 "use client";
 
+interface Prompt {
+  title: string;
+  instructions: string;
+}
+
 interface QuickPromptsProps {
-  prompts: string[];
-  onSelect: (prompt: string) => void;
+  prompts: Prompt[];
+  onSelect: (instructions: string) => void;
   className?: string;
 }
 
@@ -15,9 +20,9 @@ const QuickPrompts = ({
     <div className={`flex flex-wrap gap-3 justify-center ${className}`}>
       {prompts.map((prompt, index) => (
         <button
-          key={`${prompt}-${index}`}
+          key={`${prompt.title}-${index}`}
           type="button"
-          onClick={() => onSelect(prompt)}
+          onClick={() => onSelect(prompt.instructions)}
           className="group relative px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-gray-300 
                    bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-xl border border-slate-200/80 dark:border-gray-700/80
                    hover:bg-white dark:hover:bg-gray-800 hover:border-slate-300 dark:hover:border-gray-600
@@ -25,7 +30,7 @@ const QuickPrompts = ({
                    transition-all duration-200 hover:scale-105 active:scale-95
                    focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
         >
-          <span className="relative z-10">{prompt}</span>
+          <span className="relative z-10">{prompt.title}</span>
           <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-indigo-500/10 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity" />
         </button>
       ))}
