@@ -30,6 +30,7 @@ import remarkGfm from "remark-gfm";
 import { getSelectedModel, ModelId } from "../utils/modelConfig";
 import { SECRET_KEY } from "../utils/config";
 import { decryptSafe, getIV } from "../utils/cryptoUtils";
+import { generateSessionName } from "../utils/sessionNaming";
 import EmptyState from "./ui/EmptyState";
 import SessionCard from "./ui/SessionCard";
 
@@ -277,7 +278,9 @@ export default function PromptOptimizer({
         localStorage.setItem(`chat:${sessionId}`, JSON.stringify(payload));
 
         const firstUserMessage = messages.find((m) => m.role === "user");
-        const title = (firstUserMessage?.content || "New Chat").slice(0, 80);
+        const title = firstUserMessage?.content 
+          ? generateSessionName(firstUserMessage.content)
+          : "New Chat";
 
         setSessions((prevSessions) => {
           const existingIndex = prevSessions.findIndex(

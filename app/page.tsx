@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { decryptSafe, getIV } from "./utils/cryptoUtils";
 import { SECRET_KEY } from "./utils/config";
+import { generateSessionName } from "./utils/sessionNaming";
 import TextareaInput from "./components/ui/TextareaInput";
 import QuickPrompts from "./components/ui/QuickPrompts";
 import EmptyState from "./components/ui/EmptyState";
@@ -210,7 +211,7 @@ export default function Home() {
 
       const newSession: Session = {
         id,
-        title: text.slice(0, 80),
+        title: generateSessionName(text),
         updatedAt: Date.now(),
       };
       persistSessions([newSession, ...sessions]);

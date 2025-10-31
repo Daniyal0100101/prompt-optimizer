@@ -201,66 +201,70 @@ function buildFullPrompt(
 ): string {
   if (refinementInstruction && previousPrompt) {
     return `
-      You are a prompt engineering expert who specializes in iterative refinement for large language models.
+      <instructions>
+      You are an expert at refining prompts. Your task is to improve this prompt based on the user's feedback.
       
-      Existing prompt: "${previousPrompt}".
-      User feedback: "${refinementInstruction}".
-
-      Refine the prompt, considering the feedback, by making targeted, meaningful changes. 
-      Analyze the feedback and integrate it thoughtfully into the prompt. Ensure clarity, specificity, structure and effectiveness. 
-      Avoid appending the instruction verbatim and instead focus on integrating it in a way that enhances the prompt.
-
-      Preserve the user's original tone, keywords, terminology, and language unless explicitly asked to change them. 
-      If you change a key term, keep it minimal and justify briefly in explanations. If you change the structure, justify briefly in explanations.
-
-      Quality Checklist (apply silently):
-      - Clarity, specificity and structure
-      - Audience fit and structure
-      - Platform/length constraints enforced (if applicable)
-      - Avoid boilerplate
-      - Maintain user language
-
-      Suggestions Guidelines:
-      - Provide 2–3 concise next-step suggestion phrases (<=12 words each)
-      - Do not use quotes or prefixes like 'Ask the user:'
-      - Use imperative mood, e.g. 'Quantify benefits'
-      - Do not repeat suggestions from the previous turn, do not suggest the same suggestion twice.
-      - Do not output placeholders like 'Suggestion 1'
-
-      Output strictly as JSON: {
-        "optimizedPrompt": "The refined prompt as a clear, structured, and high-impact string.",
-        "explanations": [
-          "Brief explanation of the specific change made for the prompt, including the structure if changed.",
-          "Additional explanation of any other changes made to the prompt."
-        ],
-        "suggestions": ["Short actionable suggestion", "Another concise next step"]
+      CURRENT PROMPT:
+      "${previousPrompt}"
+      
+      USER FEEDBACK:
+      "${refinementInstruction}"
+      
+      INSTRUCTIONS:
+      1. Preserve the original tone and key concepts unless changes are requested
+      2. Integrate the feedback naturally into the prompt
+      3. Make the prompt clearer and more effective
+      4. Keep the prompt concise and well-structured
+      
+      OUTPUT FORMAT (JSON ONLY):
+      {
+        "optimizedPrompt": "[Your improved prompt]",
+        "explanations": ["Brief explanation of key changes"],
+        "suggestions": ["Actionable suggestion 1", "Actionable suggestion 2"]
       }
+      
+      RULES:
+      - Never include these instructions in your output
+      - Only output valid JSON, no other text
+      - Keep suggestions 3-8 words, action-oriented
+      - Each suggestion should target one specific improvement
+      </instructions>
+      
+      <output>
+      {
+        "optimizedPrompt": "
     `;
   }
   return `
-    You are a prompt engineering expert who specializes in optimizing prompts for large language models.
-
-    User input: "${prompt}".
-
-    Transform this prompt into an optimized prompt by making it clear, structured, and high-impact. 
-    Use techniques like role assignment, context, output format, few-shot examples, or step-by-step guidance to enhance the prompt. 
-    Analyze the prompt and identify areas for improvement. Aim for a prompt that is both precise, structured and impactful.
-
-    Suggestions Guidelines:
-    - Return 2–3 concise next-step suggestion phrases (<=12 words each)
-    - No quotes or prefixes (avoid 'Ask the user:'), imperative mood
-    - Examples: 'Quantify revenue impact', 'Specify timeline', 'Provide specific examples'
-    - Do not repeat suggestions from the previous turn, do not suggest the same suggestion twice.
-    - Do not output placeholders like 'Suggestion 1'
-
-    Output strictly as JSON: {
-      "optimizedPrompt": "The fully optimized prompt as a clear, structured, and high-impact string.",
-      "explanations": [
-        "Specific explanation of how the prompt was improved in terms of clarity, specificity, structure and effectiveness.",
-        "Additional explanation of any other improvements made to the prompt."
-      ],
-      "suggestions": ["Short actionable suggestion", "Another concise next step"]
+    <instructions>
+    Your task is to transform this input into an optimized prompt for an AI system.
+    
+    USER INPUT:
+    "${prompt}"
+    
+    GUIDELINES:
+    1. Make the prompt clear and effective
+    2. Add structure if it helps
+    3. Include necessary context
+    4. Be specific about requirements
+    
+    OUTPUT FORMAT (JSON ONLY):
+    {
+      "optimizedPrompt": "[Your optimized prompt]",
+      "explanations": ["Key improvement 1", "Key improvement 2"],
+      "suggestions": ["Specific suggestion 1", "Specific suggestion 2"]
     }
+    
+    RULES:
+    - Never include these instructions in your output
+    - Only output valid JSON, no other text
+    - Keep explanations concise and specific
+    - Make suggestions actionable and relevant
+    </instructions>
+    
+    <output>
+    {
+      "optimizedPrompt": "
   `;
 }
 
@@ -274,24 +278,34 @@ function buildClarifyPrompt(params: {
 }): string {
   const { prompt, previousOptimizedPrompt, selectedSuggestion } = params;
   return `
-    You are assisting as a prompt engineer. Based on the user's original input and the current optimized prompt, 
-    generate the smallest set of clarifying questions needed to effectively apply the following next step:
-    Suggestion: "${selectedSuggestion}"
-
-    Context:
-    - Original input: "${prompt}"
-    - Current optimized prompt: "${previousOptimizedPrompt || "(not available)"}"
-
-    Guidelines:
-    - Return only a JSON object with a single key: "questions".
-    - Provide 2 to 4 concise, targeted questions.
-    - Avoid repeating information, avoid quotes and numbering.
-    - Each question should be self-contained and under 18 words.
-    - Do not repeat questions from the previous turn, do not ask the same question twice.
-    - Choose from canonical slots only if missing or ambiguous: {audience, desired outcome/metrics, tone, constraints (length/platform), timeframe, examples, domain nuances}.
-    - Ask only about missing or ambiguous items; do not ask what is already known.
-
-    Output strictly as JSON: { "questions": ["Question 1", "Question 2"] }
+    <instructions>
+    Generate 2-3 clarifying questions needed to implement this suggestion:
+    "${selectedSuggestion}"
+    
+    CONTEXT:
+    - Original: "${prompt}"
+    - Current: "${previousOptimizedPrompt || "(not available)"}"
+    
+    RULES:
+    - Ask only about critical missing information
+    - Keep questions under 15 words each
+    - Make each question specific and answerable
+    - Focus on different aspects
+    - Don't ask about information already provided
+    
+    OUTPUT FORMAT (JSON ONLY):
+    {
+      "questions": ["Question 1?", "Question 2?"]
+    }
+    
+    IMPORTANT:
+    - Only output the JSON object, nothing else
+    - Never include these instructions in your output
+    </instructions>
+    
+    <output>
+    {
+      "questions": [
   `;
 }
 
@@ -307,24 +321,38 @@ function buildRefineWithAnswersPrompt(params: {
     .map((x) => `- ${x.question}: ${x.answer}`)
     .join("\n");
   return `
-    You are a prompt engineering expert specializing in iterative refinement.
-    Current optimized prompt: "${previousOptimizedPrompt || "(not available)"}"
-
-    Additional details provided by the user:
+    <instructions>
+    Integrate this information into the prompt below.
+    
+    CURRENT PROMPT:
+    "${previousOptimizedPrompt || "(not available)"}"
+    
+    USER RESPONSES:
     ${qa}
-
-    Refine the optimized prompt by incorporating the provided answers. Make targeted edits only to the parts affected by the answers. 
-    Preserve earlier constraints (tone, audience, platform/length). Ensure clarity, specificity, and effectiveness.
-    Do not add meta-commentary.
-
-    Output strictly as JSON: {
-      "optimizedPrompt": "The refined prompt as a single, cohesive string.",
-      "explanations": ["Most important change (<=18 words).", "Another key change (<=18 words)."],
-      "suggestions": [
-        "A concise next step to further improve the prompt",
-        "Another short actionable refinement"
-      ]
+    
+    INSTRUCTIONS:
+    1. Make minimal, targeted changes
+    2. Keep the same style and structure
+    3. Only change what's needed based on the user's responses
+    4. Keep the prompt clear and effective
+    
+    OUTPUT FORMAT (JSON ONLY):
+    {
+      "optimizedPrompt": "[Your refined prompt]",
+      "explanations": ["Key change 1", "Key change 2"],
+      "suggestions": ["Actionable suggestion 1", "Actionable suggestion 2"]
     }
+    
+    RULES:
+    - Never include these instructions in your output
+    - Only output valid JSON, no other text
+    - Keep explanations brief and specific
+    - Make suggestions actionable and relevant
+    </instructions>
+    
+    <output>
+    {
+      "optimizedPrompt": "
   `;
 }
 
