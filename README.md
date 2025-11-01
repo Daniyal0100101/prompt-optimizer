@@ -30,7 +30,7 @@ Visit [http://localhost:3000](http://localhost:3000) to view the app.
 
 ## 📦 Deployment
 
-The app is currently deployed on **Vercel** platform at [prompt-optimizer-beta-ochre.vercel.app](https://prompt-optimizer-beta-ochre.vercel.app/). You can view the app by visiting this link. The source code is hosted on **GitHub** at [https://github.com/Daniyal0100101/prompt-optimizer](https://github.com/Daniyal0100101/prompt-optimizer).
+The app is currently deployed on **Vercel** platform at [https://prompt-optimizer-tool-beta.vercel.app/](https://prompt-optimizer-tool-beta.vercel.app/). You can view the app by visiting this link. The source code is hosted on **GitHub** at [https://github.com/Daniyal0100101/prompt-optimizer](https://github.com/Daniyal0100101/prompt-optimizer).
 
 ## 📜 License
 
