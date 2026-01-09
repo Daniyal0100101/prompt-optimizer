@@ -8,6 +8,7 @@ import { toast } from "react-hot-toast";
 import { decryptSafe, getIV } from "./utils/cryptoUtils";
 import { SECRET_KEY } from "./utils/config";
 import { generateSessionName } from "./utils/sessionNaming";
+import { getSelectedModel, type ModelId } from "./utils/modelConfig";
 import TextareaInput from "./components/ui/TextareaInput";
 import QuickPrompts from "./components/ui/QuickPrompts";
 import EmptyState from "./components/ui/EmptyState";
@@ -51,6 +52,9 @@ export default function Home() {
   const [loadingStage, setLoadingStage] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchFilter, setSearchFilter] = useState("");
+  const [selectedModel, setSelectedModel] = useState<ModelId>(
+    getSelectedModel()
+  );
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const router = useRouter();
 
@@ -99,6 +103,12 @@ export default function Home() {
       }
     } catch (error) {
       console.warn("Failed to load view_mode", error);
+    }
+
+    try {
+      setSelectedModel(getSelectedModel());
+    } catch (error) {
+      console.warn("Failed to load selected model", error);
     }
   }, []);
 
@@ -184,7 +194,7 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           prompt: text,
-          model: "gemini-2.0-flash",
+          model: selectedModel,
           apiKey: decryptedKey,
         }),
       });
