@@ -1,7 +1,8 @@
 export type ModelId =
-  | "gemini-1.5-flash"
   | "gemini-2.0-flash"
-  | "gemini-2.5-flash";
+  | "gemini-2.5-flash"
+  | "gemini-2.5-flash-lite"
+  | "gemini-2.5-pro";
 
 export interface ModelInfo {
   id: ModelId;
@@ -10,27 +11,10 @@ export interface ModelInfo {
   maxTokens: number; // Input token limit
   outputTokens: number; // Output token limit
   contextWindow: number; // Same as maxTokens for clarity
+  recommended?: boolean;
 }
 
 export const SUPPORTED_MODELS: ModelInfo[] = [
-  {
-    id: "gemini-1.5-flash",
-    name: "Gemini 1.5 Flash",
-    description:
-      "Fast and versatile multimodal model for scaling across diverse tasks",
-    maxTokens: 1_048_576, // 1M tokens input
-    outputTokens: 8_192, // 8K tokens output
-    contextWindow: 1_048_576,
-  },
-  {
-    id: "gemini-2.0-flash",
-    name: "Gemini 2.0 Flash",
-    description:
-      "Next-gen features with superior speed, native tool use, and 1M token context",
-    maxTokens: 1_048_576, // 1M tokens input
-    outputTokens: 8_192, // 8K tokens output
-    contextWindow: 1_048_576,
-  },
   {
     id: "gemini-2.5-flash",
     name: "Gemini 2.5 Flash",
@@ -39,10 +23,38 @@ export const SUPPORTED_MODELS: ModelInfo[] = [
     maxTokens: 1_048_576, // 1M tokens input
     outputTokens: 65_536, // 64K tokens output
     contextWindow: 1_048_576,
+    recommended: true,
+  },
+  {
+    id: "gemini-2.5-flash-lite",
+    name: "Gemini 2.5 Flash-Lite",
+    description:
+      "Most cost-efficient option for high-volume tasks with excellent quality",
+    maxTokens: 1_048_576, // 1M tokens input
+    outputTokens: 8_192, // 8K tokens output
+    contextWindow: 1_048_576,
+  },
+  {
+    id: "gemini-2.5-pro",
+    name: "Gemini 2.5 Pro",
+    description:
+      "Flagship thinking model for complex reasoning, coding, and multi-step tasks",
+    maxTokens: 1_048_576, // 1M tokens input
+    outputTokens: 65_536, // 64K tokens output
+    contextWindow: 1_048_576,
+  },
+  {
+    id: "gemini-2.0-flash",
+    name: "Gemini 2.0 Flash",
+    description:
+      "Fast responses with native tool use and multimodal capabilities",
+    maxTokens: 1_048_576, // 1M tokens input
+    outputTokens: 8_192, // 8K tokens output
+    contextWindow: 1_048_576,
   },
 ];
 
-// Get default model ID - 2.5 Flash is now the best price-performance option
+// Get default model ID - 2.5 Flash is the recommended price-performance option
 export const getDefaultModelId = (): ModelId => "gemini-2.5-flash";
 
 // Get model by ID
@@ -78,23 +90,13 @@ export const getTokenInfo = () => ({
 // Validate if a model supports specific features
 export const getModelCapabilities = (modelId: ModelId) => {
   const capabilities = {
-    "gemini-1.5-flash": {
-      multimodal: true,
-      functionCalling: true,
-      caching: true,
-      tuning: true,
-      codeExecution: true,
-      maxImages: 3_600,
-      maxVideoLength: "1 hour",
-      maxAudioLength: "~9.5 hours",
-    },
     "gemini-2.0-flash": {
       multimodal: true,
       functionCalling: true,
       caching: true,
       tuning: false,
       codeExecution: true,
-      thinking: "experimental",
+      thinking: false,
       liveAPI: true,
       maxVideoLength: "varies",
       maxAudioLength: "varies",
@@ -107,6 +109,29 @@ export const getModelCapabilities = (modelId: ModelId) => {
       codeExecution: true,
       thinking: true,
       searchGrounding: true,
+      maxVideoLength: "varies",
+      maxAudioLength: "varies",
+    },
+    "gemini-2.5-flash-lite": {
+      multimodal: true,
+      functionCalling: true,
+      caching: true,
+      tuning: false,
+      codeExecution: true,
+      thinking: true,
+      searchGrounding: false,
+      maxVideoLength: "varies",
+      maxAudioLength: "varies",
+    },
+    "gemini-2.5-pro": {
+      multimodal: true,
+      functionCalling: true,
+      caching: true,
+      tuning: false,
+      codeExecution: true,
+      thinking: true,
+      searchGrounding: true,
+      reasoning: "advanced",
       maxVideoLength: "varies",
       maxAudioLength: "varies",
     },

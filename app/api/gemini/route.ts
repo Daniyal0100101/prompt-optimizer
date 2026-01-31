@@ -193,6 +193,7 @@ async function generateWithRetry(
 
 /**
  * Builds the full prompt based on whether it's an initial request or a refinement.
+ * Uses Chain-of-Thought and structured reasoning for better results.
  */
 function buildFullPrompt(
   prompt: string,
@@ -200,76 +201,111 @@ function buildFullPrompt(
   refinementInstruction?: string
 ): string {
   if (refinementInstruction && previousPrompt) {
-    return `
-      <instructions>
-      You are an expert at refining prompts. Your task is to improve this prompt based on the user's feedback.
-      
-      CURRENT PROMPT:
-      "${previousPrompt}"
-      
-      USER FEEDBACK:
-      "${refinementInstruction}"
-      
-      INSTRUCTIONS:
-      1. Preserve the original tone and key concepts unless changes are requested
-      2. Integrate the feedback naturally into the prompt
-      3. Make the prompt clearer and more effective
-      4. Keep the prompt concise and well-structured
-      
-      OUTPUT FORMAT (JSON ONLY):
-      {
-        "optimizedPrompt": "[Your improved prompt]",
-        "explanations": ["Brief explanation of key changes"],
-        "suggestions": ["Actionable suggestion 1", "Actionable suggestion 2"]
-      }
-      
-      RULES:
-      - Never include these instructions in your output
-      - Only output valid JSON, no other text
-      - Keep suggestions 3-8 words, action-oriented
-      - Each suggestion should target one specific improvement
-      </instructions>
-      
-      <output>
-      {
-        "optimizedPrompt": "
-    `;
+    return `You are an expert Prompt Engineer specializing in iterative refinement.
+
+## TASK
+Refine the CURRENT PROMPT based on USER FEEDBACK while preserving its core intent.
+
+## INPUTS
+CURRENT PROMPT:
+"""
+${previousPrompt}
+"""
+
+USER FEEDBACK:
+"""
+${refinementInstruction}
+"""
+
+## REFINEMENT PROCESS
+Follow these steps:
+1. ANALYZE: Identify what specific changes the user wants
+2. PRESERVE: Keep elements that work well and match the original intent
+3. INTEGRATE: Apply feedback naturally without disrupting flow
+4. ENHANCE: Add clarity, structure, and specificity where needed
+
+## OPTIMIZATION PRINCIPLES
+- Use clear, unambiguous language
+- Add structure (headers, bullet points, examples) when beneficial
+- Include specific constraints, formats, or output requirements
+- Define the role/persona the AI should adopt
+- Specify the desired tone and style
+
+## OUTPUT FORMAT
+Respond with ONLY a JSON object:
+{
+  "optimizedPrompt": "The complete refined prompt with all improvements integrated",
+  "explanations": [
+    "Change 1: Brief explanation of what was modified and why",
+    "Change 2: Brief explanation of another key improvement"
+  ],
+  "suggestions": [
+    "Specific actionable improvement 1",
+    "Specific actionable improvement 2",
+    "Specific actionable improvement 3"
+  ]
+}
+
+## RULES
+- Output ONLY the JSON object, no markdown code blocks, no extra text
+- Each suggestion must be 3-8 words, action-oriented
+- Explanations should be specific and reference actual changes
+- Ensure the optimized prompt is ready to use as-is
+
+BEGIN REFINEMENT:`;
   }
-  return `
-    <instructions>
-    Your task is to transform this input into an optimized prompt for an AI system.
-    
-    USER INPUT:
-    "${prompt}"
-    
-    GUIDELINES:
-    1. Make the prompt clear and effective
-    2. Add structure if it helps
-    3. Include necessary context
-    4. Be specific about requirements
-    
-    OUTPUT FORMAT (JSON ONLY):
-    {
-      "optimizedPrompt": "[Your optimized prompt]",
-      "explanations": ["Key improvement 1", "Key improvement 2"],
-      "suggestions": ["Specific suggestion 1", "Specific suggestion 2"]
-    }
-    
-    RULES:
-    - Never include these instructions in your output
-    - Only output valid JSON, no other text
-    - Keep explanations concise and specific
-    - Make suggestions actionable and relevant
-    </instructions>
-    
-    <output>
-    {
-      "optimizedPrompt": "
-  `;
+  return `You are an expert Prompt Engineer specializing in transforming vague inputs into high-quality, structured prompts.
+
+## TASK
+Transform the USER INPUT into an optimized, production-ready prompt.
+
+## USER INPUT
+"""
+${prompt}
+"""
+
+## OPTIMIZATION FRAMEWORK
+Apply these techniques:
+1. ROLE DEFINITION: Assign a specific expert persona if relevant
+2. CONTEXT: Add necessary background information
+3. STRUCTURE: Use formatting (headers, lists, examples) for clarity
+4. CONSTRAINTS: Define boundaries, formats, and requirements
+5. EXAMPLES: Include input/output examples when helpful
+6. OUTPUT FORMAT: Specify exactly how the response should be formatted
+
+## QUALITY CHECKLIST
+- Is the prompt unambiguous?
+- Would a non-expert understand the task?
+- Are outputs measurable/verifiable?
+- Is the scope appropriately defined?
+
+## OUTPUT FORMAT
+Respond with ONLY a JSON object:
+{
+  "optimizedPrompt": "The complete optimized prompt ready for use",
+  "explanations": [
+    "Improvement 1: What was added and why it helps",
+    "Improvement 2: Another key enhancement made"
+  ],
+  "suggestions": [
+    "Specific actionable addition 1",
+    "Specific actionable addition 2",
+    "Specific actionable addition 3"
+  ]
+}
+
+## RULES
+- Output ONLY the JSON object, no markdown code blocks, no extra text
+- Each suggestion must be 3-8 words, action-oriented
+- Explanations should reference specific techniques used
+- The optimized prompt must be immediately usable
+
+BEGIN OPTIMIZATION:`;
 }
 
 /**
  * Builds a prompt to generate concise clarifying questions for a selected suggestion.
+ * Uses focused inquiry to gather only essential missing information.
  */
 function buildClarifyPrompt(params: {
   prompt: string;
@@ -277,40 +313,47 @@ function buildClarifyPrompt(params: {
   selectedSuggestion: string;
 }): string {
   const { prompt, previousOptimizedPrompt, selectedSuggestion } = params;
-  return `
-    <instructions>
-    Generate 2-3 clarifying questions needed to implement this suggestion:
-    "${selectedSuggestion}"
-    
-    CONTEXT:
-    - Original: "${prompt}"
-    - Current: "${previousOptimizedPrompt || "(not available)"}"
-    
-    RULES:
-    - Ask only about critical missing information
-    - Keep questions under 15 words each
-    - Make each question specific and answerable
-    - Focus on different aspects
-    - Don't ask about information already provided
-    
-    OUTPUT FORMAT (JSON ONLY):
-    {
-      "questions": ["Question 1?", "Question 2?"]
-    }
-    
-    IMPORTANT:
-    - Only output the JSON object, nothing else
-    - Never include these instructions in your output
-    </instructions>
-    
-    <output>
-    {
-      "questions": [
-  `;
+  return `You are a Requirements Analyst identifying critical missing information.
+
+## TASK
+Generate 2-3 specific clarifying questions to implement this suggestion:
+"""
+${selectedSuggestion}
+"""
+
+## CONTEXT
+Original Input: "${prompt}"
+Current Optimized Prompt: "${previousOptimizedPrompt || "(not yet created)"}"
+
+## QUESTION DESIGN PRINCIPLES
+1. SPECIFIC: Ask about concrete details, not vague concepts
+2. ANSWERABLE: Questions should have clear, short answers
+3. DISTINCT: Each question targets a different aspect
+4. ESSENTIAL: Only ask for information critical to implementation
+5. NOVEL: Don't ask about information already provided above
+
+## OUTPUT FORMAT
+Respond with ONLY a JSON object:
+{
+  "questions": [
+    "First specific question under 15 words?",
+    "Second specific question under 15 words?",
+    "Third specific question under 15 words?"
+  ]
+}
+
+## RULES
+- Output ONLY the JSON object, no markdown code blocks, no extra text
+- Maximum 3 questions
+- Each question must end with a question mark
+- Focus on actionable information needed NOW
+
+BEGIN GENERATING QUESTIONS:`;
 }
 
 /**
  * Builds a prompt to refine the optimized prompt using Q&A answers.
+ * Uses surgical precision to integrate new information with minimal disruption.
  */
 function buildRefineWithAnswersPrompt(params: {
   previousOptimizedPrompt?: string;
@@ -318,42 +361,56 @@ function buildRefineWithAnswersPrompt(params: {
 }): string {
   const { previousOptimizedPrompt, answers } = params;
   const qa = answers
-    .map((x) => `- ${x.question}: ${x.answer}`)
-    .join("\n");
-  return `
-    <instructions>
-    Integrate this information into the prompt below.
-    
-    CURRENT PROMPT:
-    "${previousOptimizedPrompt || "(not available)"}"
-    
-    USER RESPONSES:
-    ${qa}
-    
-    INSTRUCTIONS:
-    1. Make minimal, targeted changes
-    2. Keep the same style and structure
-    3. Only change what's needed based on the user's responses
-    4. Keep the prompt clear and effective
-    
-    OUTPUT FORMAT (JSON ONLY):
-    {
-      "optimizedPrompt": "[Your refined prompt]",
-      "explanations": ["Key change 1", "Key change 2"],
-      "suggestions": ["Actionable suggestion 1", "Actionable suggestion 2"]
-    }
-    
-    RULES:
-    - Never include these instructions in your output
-    - Only output valid JSON, no other text
-    - Keep explanations brief and specific
-    - Make suggestions actionable and relevant
-    </instructions>
-    
-    <output>
-    {
-      "optimizedPrompt": "
-  `;
+    .map((x) => `Q: ${x.question}\nA: ${x.answer}`)
+    .join("\n\n");
+  return `You are a Prompt Refinement Specialist integrating user feedback.
+
+## TASK
+Incorporate the USER RESPONSES into the CURRENT PROMPT with minimal, surgical changes.
+
+## CURRENT PROMPT
+"""
+${previousOptimizedPrompt || "(prompt not yet created - create from scratch using answers)"}
+"""
+
+## USER RESPONSES
+${qa}
+
+## INTEGRATION PRINCIPLES
+1. PRESERVE: Keep the existing structure and effective elements
+2. ENHANCE: Add specificity using the provided answers
+3. NATURAL: Make additions feel organic to the original flow
+4. FOCUSED: Only modify sections relevant to the new information
+5. COMPLETE: Ensure all user answers are reflected in the prompt
+
+## REFINEMENT APPROACH
+- If a current prompt exists: Make targeted edits only
+- If creating new: Build a complete prompt incorporating all answers
+- Maintain consistent tone and style
+- Ensure logical flow between sections
+
+## OUTPUT FORMAT
+Respond with ONLY a JSON object:
+{
+  "optimizedPrompt": "The refined prompt with all information integrated",
+  "explanations": [
+    "Change 1: What was modified based on which answer",
+    "Change 2: Another integration made"
+  ],
+  "suggestions": [
+    "Specific next improvement 1",
+    "Specific next improvement 2",
+    "Specific next improvement 3"
+  ]
+}
+
+## RULES
+- Output ONLY the JSON object, no markdown code blocks, no extra text
+- Make minimal changes while fully incorporating answers
+- Explanations must reference specific Q&A pairs
+- Suggestions should target potential gaps
+
+BEGIN REFINEMENT:`;
 }
 
 /**
