@@ -134,7 +134,7 @@ export default function PromptOptimizer({
   const [isLoading, setIsLoading] = useState(false);
   const [isApiKeyValid, setIsApiKeyValid] = useState(false);
   const [selectedModel, setSelectedModel] =
-    useState<ModelId>("gemini-1.5-flash");
+    useState<ModelId>("gemini-2.5-flash");
   const [apiKey, setApiKey] = useState(apiKeyProp || "");
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);

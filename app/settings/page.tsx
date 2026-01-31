@@ -79,20 +79,25 @@ export default function SettingsPage() {
 
   // Model info for display
   const modelInfo = {
-    "gemini-1.5-flash": {
-      name: "Gemini 1.5 Flash",
-      description: "Fast and versatile for diverse tasks",
-      features: ["1M context", "8K output", "Multimodal"],
+    "gemini-2.5-flash": {
+      name: "Gemini 2.5 Flash",
+      description: "Best price-performance with thinking capabilities",
+      features: ["1M context", "64K output", "Thinking", "Recommended"],
+    },
+    "gemini-2.5-flash-lite": {
+      name: "Gemini 2.5 Flash-Lite",
+      description: "Most cost-efficient for high-volume tasks",
+      features: ["1M context", "8K output", "Thinking", "Cost-efficient"],
+    },
+    "gemini-2.5-pro": {
+      name: "Gemini 2.5 Pro",
+      description: "Flagship model for complex reasoning",
+      features: ["1M context", "64K output", "Advanced reasoning"],
     },
     "gemini-2.0-flash": {
       name: "Gemini 2.0 Flash",
-      description: "Next-gen with superior speed",
+      description: "Fast responses with native tool use",
       features: ["1M context", "8K output", "Tool use", "Live API"],
-    },
-    "gemini-2.5-flash": {
-      name: "Gemini 2.5 Flash",
-      description: "Best price-performance with thinking",
-      features: ["1M context", "64K output", "Thinking", "Best value"],
     },
   };
 
