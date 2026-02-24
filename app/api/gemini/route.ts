@@ -460,7 +460,7 @@ export async function POST(
     const body: ApiRequestBody = await req.json();
     const {
       prompt,
-      model = "gemini-2.0-flash",
+      model = "gemini-2.5-flash",
       apiKey,
       previousPrompt,
       refinementInstruction,

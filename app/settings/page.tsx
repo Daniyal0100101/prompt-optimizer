@@ -94,11 +94,7 @@ export default function SettingsPage() {
       description: "Flagship model for complex reasoning",
       features: ["1M context", "64K output", "Advanced reasoning"],
     },
-    "gemini-2.0-flash": {
-      name: "Gemini 2.0 Flash",
-      description: "Fast responses with native tool use",
-      features: ["1M context", "8K output", "Tool use", "Live API"],
-    },
+
   };
 
   if (!mounted || isLoading) {

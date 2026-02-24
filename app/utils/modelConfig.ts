@@ -1,5 +1,4 @@
 export type ModelId =
-  | "gemini-2.0-flash"
   | "gemini-2.5-flash"
   | "gemini-2.5-flash-lite"
   | "gemini-2.5-pro";
@@ -43,15 +42,7 @@ export const SUPPORTED_MODELS: ModelInfo[] = [
     outputTokens: 65_536, // 64K tokens output
     contextWindow: 1_048_576,
   },
-  {
-    id: "gemini-2.0-flash",
-    name: "Gemini 2.0 Flash",
-    description:
-      "Fast responses with native tool use and multimodal capabilities",
-    maxTokens: 1_048_576, // 1M tokens input
-    outputTokens: 8_192, // 8K tokens output
-    contextWindow: 1_048_576,
-  },
+
 ];
 
 // Get default model ID - 2.5 Flash is the recommended price-performance option
@@ -90,17 +81,7 @@ export const getTokenInfo = () => ({
 // Validate if a model supports specific features
 export const getModelCapabilities = (modelId: ModelId) => {
   const capabilities = {
-    "gemini-2.0-flash": {
-      multimodal: true,
-      functionCalling: true,
-      caching: true,
-      tuning: false,
-      codeExecution: true,
-      thinking: false,
-      liveAPI: true,
-      maxVideoLength: "varies",
-      maxAudioLength: "varies",
-    },
+
     "gemini-2.5-flash": {
       multimodal: true,
       functionCalling: true,
