@@ -16,14 +16,14 @@
     "clsx": "^2.1.1",
     "crypto-js": "^4.2.0",
     "lucide-react": "^0.544.0",
-    "next": "15.5.9",
-    "react": "^19",
-    "react-dom": "^19",
+    "next": "^15.5.9",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
     "react-hot-toast": "^2.6.0",
     "react-markdown": "^9.1.0",
     "remark-gfm": "^4.0.1",
-    "sharp": "^0.34.3",
-    "tailwind-merge": "^3.3.1"
+    "sharp": "^0.34.5",
+    "tailwind-merge": "^3.5.0"
   },
   "devDependencies": {
     "@types/crypto-js": "^4.2.2",
@@ -34,7 +34,7 @@
     "eslint": "^8.57.0",
     "eslint-config-next": "15.5.3",
     "postcss": "^8.4.35",
-    "tailwindcss": "^3.4.1",
+    "tailwindcss": "^3.4.19",
     "typescript": "^5.3.3"
   }
 }
