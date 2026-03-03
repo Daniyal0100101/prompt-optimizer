@@ -6,7 +6,6 @@ dist/
 .cache/
 .turbo/
 .vercel/
-.vercel/
 .cursor/
 .vscode/
 
@@ -24,4 +23,3 @@ pnpm-debug.log*
 
 # misc
 coverage/
-.vercel
