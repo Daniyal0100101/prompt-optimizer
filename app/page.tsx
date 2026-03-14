@@ -6,7 +6,7 @@ import { Settings, Clock, Grid, List, Plus, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { decryptSafe, getIV } from "./utils/cryptoUtils";
-import { SECRET_KEY } from "./utils/config";
+import { HAS_SECRET_KEY, SECRET_KEY } from "./utils/config";
 import { generateSessionName } from "./utils/sessionNaming";
 import { getSelectedModel, type ModelId } from "./utils/modelConfig";
 import TextareaInput from "./components/ui/TextareaInput";
@@ -61,23 +61,28 @@ export default function Home() {
   useEffect(() => {
     // Check for API key
     try {
-      const savedKey = localStorage.getItem("API_KEY");
-      if (savedKey) {
-        const iv = getIV(SECRET_KEY);
-        const result = decryptSafe(savedKey, SECRET_KEY, iv);
+      if (!HAS_SECRET_KEY) {
+        localStorage.removeItem("API_KEY");
+        setHasKey(false);
+      } else {
+        const savedKey = localStorage.getItem("API_KEY");
+        if (savedKey) {
+          const iv = getIV(SECRET_KEY);
+          const result = decryptSafe(savedKey, SECRET_KEY, iv);
 
-        if (result.ok && result.plaintext) {
-          setHasKey(true);
-        } else {
-          console.warn("Failed to decrypt API key");
-          if (!result.ok) {
-            const errorResult = result as { reason?: string };
-            console.warn("Reason:", errorResult.reason || "Unknown error");
+          if (result.ok && result.plaintext) {
+            setHasKey(true);
+          } else {
+            console.warn("Failed to decrypt API key");
+            if (!result.ok) {
+              const errorResult = result as { reason?: string };
+              console.warn("Reason:", errorResult.reason || "Unknown error");
+            }
+            setHasKey(false);
           }
+        } else {
           setHasKey(false);
         }
-      } else {
-        setHasKey(false);
       }
     } catch (error) {
       console.error("Error checking API key", error);
@@ -376,7 +381,9 @@ export default function Home() {
                   Get Started
                 </h3>
                 <p className="text-sm text-slate-600 dark:text-gray-400 mb-4 max-w-sm mx-auto">
-                  Add your API key to start optimizing prompts with AI
+                  {HAS_SECRET_KEY
+                    ? "Add your API key to start optimizing prompts with AI"
+                    : "Ask the app owner to configure NEXT_PUBLIC_SECRET_KEY before saving API keys."}
                 </p>
                 <Link
                   href="/settings"

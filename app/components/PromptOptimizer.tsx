@@ -28,7 +28,7 @@ import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { getSelectedModel, ModelId } from "../utils/modelConfig";
-import { SECRET_KEY } from "../utils/config";
+import { HAS_SECRET_KEY, SECRET_KEY } from "../utils/config";
 import { decryptSafe, getIV } from "../utils/cryptoUtils";
 import { generateSessionName } from "../utils/sessionNaming";
 import EmptyState from "./ui/EmptyState";
@@ -172,6 +172,14 @@ export default function PromptOptimizer({
   const loadSettingsFromStorage = useCallback(() => {
     if (typeof window === "undefined") return;
     try {
+      if (!HAS_SECRET_KEY) {
+        localStorage.removeItem("API_KEY");
+        setApiKey("");
+        setIsApiKeyValid(false);
+        setSelectedModel(getSelectedModel());
+        return;
+      }
+
       const savedKey = localStorage.getItem("API_KEY");
       if (savedKey) {
         const iv = getIV(SECRET_KEY);
@@ -1255,7 +1263,9 @@ export default function PromptOptimizer({
             </div>
             {!isApiKeyValid && (
               <div className="mt-2 text-xs text-amber-600 dark:text-amber-400 px-1">
-                API key required. Visit Settings to configure.
+                {HAS_SECRET_KEY
+                  ? "API key required. Visit Settings to configure."
+                  : "Storage is disabled until NEXT_PUBLIC_SECRET_KEY is configured for this app."}
               </div>
             )}
           </form>

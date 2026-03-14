@@ -8,7 +8,7 @@ import {
   saveSelectedModel,
   ModelId,
 } from "../utils/modelConfig";
-import { SECRET_KEY } from "../utils/config";
+import { HAS_SECRET_KEY, SECRET_KEY } from "../utils/config";
 import { decryptSafe, encryptSafe, getIV } from "../utils/cryptoUtils";
 
 interface ApiKeyInputProps {
@@ -40,62 +40,38 @@ export default function ApiKeyInput({
       const savedKey = localStorage.getItem("API_KEY");
       if (!savedKey) return;
 
+      if (!HAS_SECRET_KEY) {
+        console.warn(
+          "NEXT_PUBLIC_SECRET_KEY is missing. Clearing stored API key because it cannot be decrypted safely."
+        );
+        localStorage.removeItem("API_KEY");
+        onKeyVerified(false);
+        return;
+      }
+
       try {
-        // First try to decrypt with the current key
-        try {
-          const iv = getIV(SECRET_KEY);
-          const result = decryptSafe(savedKey, SECRET_KEY, iv);
+        const iv = getIV(SECRET_KEY);
+        const result = decryptSafe(savedKey, SECRET_KEY, iv);
 
-          // If decryption succeeds and there's a plaintext, trust the stored key without re-validating.
-          // Validation is enforced when the user first saves the key.
-          if (result.ok) {
-            setApiKey(result.plaintext);
-            setIsValid(true);
-            setIsSaved(true);
-            onKeyVerified(true);
-            return;
-          }
-          // Decryption failed, will try fallback
-        } catch {
-          console.warn(
-            "Failed to decrypt with current key, trying fallback..."
-          );
+        // If decryption succeeds and there's a plaintext, trust the stored key without re-validating.
+        // Validation is enforced when the user first saves the key.
+        if (result.ok) {
+          setApiKey(result.plaintext);
+          setIsValid(true);
+          setIsSaved(true);
+          onKeyVerified(true);
+          return;
         }
 
-        // If we get here, decryption failed - try with the hardcoded fallback key
-        const FALLBACK_KEY = "uJioow3SoPYeAG3iEBRGlSAdFMi8C10AfZVrw3X_4dg=";
-        if (SECRET_KEY !== FALLBACK_KEY) {
-          try {
-            const iv = getIV(FALLBACK_KEY);
-            const result = decryptSafe(savedKey, FALLBACK_KEY, iv);
-
-            if (result.ok) {
-              // Re-encrypt with the new key for next time
-              const newIv = getIV(SECRET_KEY);
-              const encrypted = encryptSafe(result.plaintext, SECRET_KEY, newIv);
-
-              localStorage.setItem("API_KEY", encrypted.toString());
-
-              setApiKey(result.plaintext);
-              setIsValid(true);
-              setIsSaved(true);
-              onKeyVerified(true);
-              return;
-            }
-            // Fallback decryption failed
-          } catch {
-            console.warn("Failed to decrypt with fallback key");
-          }
-        }
-
-        // If we get here, decryption failed with both keys
-        console.error("Failed to decrypt API key with any available key");
+        console.error("Failed to decrypt saved API key", result);
         toast.error("Failed to load saved API key. Please enter it again.");
         localStorage.removeItem("API_KEY");
+        onKeyVerified(false);
       } catch (error) {
         console.error("Error loading saved API key:", error);
         toast.error("Error loading saved API key. Please enter it again.");
         localStorage.removeItem("API_KEY");
+        onKeyVerified(false);
       }
     };
 
@@ -127,6 +103,13 @@ export default function ApiKeyInput({
 
     if (!validateApiKey(apiKey)) {
       toast.error("Please enter a valid Gemini API key");
+      return;
+    }
+
+    if (!HAS_SECRET_KEY) {
+      toast.error(
+        "Storage is disabled until NEXT_PUBLIC_SECRET_KEY is configured for this app."
+      );
       return;
     }
 
@@ -280,9 +263,11 @@ export default function ApiKeyInput({
       <div className="mt-3 text-sm text-gray-500 dark:text-gray-400 flex items-start">
         <AlertCircle className="mr-1.5 mt-0.5 flex-shrink-0" />
         <span>
-          {isSaved
-            ? "API key is saved. You can now use the app."
-            : "Your key is stored locally and never sent to our servers."}{" "}
+          {!HAS_SECRET_KEY
+            ? "This app needs NEXT_PUBLIC_SECRET_KEY configured before it can store your API key in the browser."
+            : isSaved
+            ? "API key is saved in this browser for this app session and is only sent when you make a Gemini request."
+            : "Your key is encrypted in this browser for local storage and is only sent when you submit a Gemini request through this app."}{" "}
           <a
             href="https://aistudio.google.com/app/apikey"
             target="_blank"
@@ -299,7 +284,7 @@ export default function ApiKeyInput({
         {!isSaved ? (
           <button
             onClick={handleSaveKey}
-            disabled={!apiKey || !isValid}
+            disabled={!HAS_SECRET_KEY || !apiKey || !isValid}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
           >
             Save Key
