@@ -181,7 +181,9 @@ export default function SettingsPage() {
                 >
                   {hasApiKey
                     ? "Your API key is configured and ready to use"
-                    : "Add your Gemini API key after NEXT_PUBLIC_SECRET_KEY is configured for this app."}
+                    : HAS_SECRET_KEY
+                      ? "Add your Gemini API key to start optimizing."
+                      : "API key storage is temporarily unavailable. Please try again shortly."}
                 </p>
               </div>
             </div>
