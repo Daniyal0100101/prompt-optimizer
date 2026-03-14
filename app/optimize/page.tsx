@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { decryptSafe, getIV } from "../utils/cryptoUtils";
-import { SECRET_KEY } from "../utils/config";
+import { HAS_SECRET_KEY, SECRET_KEY } from "../utils/config";
 
 export default function OptimizePage() {
   const router = useRouter();
@@ -13,6 +13,12 @@ export default function OptimizePage() {
     setIsClient(true);
 
     try {
+      if (!HAS_SECRET_KEY) {
+        localStorage.removeItem("API_KEY");
+        router.replace("/settings");
+        return;
+      }
+
       // Check for API key before allowing access
       const savedKey = localStorage.getItem("API_KEY");
       if (!savedKey) {
@@ -21,7 +27,7 @@ export default function OptimizePage() {
         return;
       }
 
-      const iv = SECRET_KEY ? getIV(SECRET_KEY) : undefined;
+      const iv = getIV(SECRET_KEY);
       const result = decryptSafe(savedKey, SECRET_KEY, iv);
 
       if (!result.ok || !result.plaintext) {

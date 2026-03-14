@@ -16,6 +16,7 @@ import {
   Info,
   ExternalLink,
 } from "lucide-react";
+import { HAS_SECRET_KEY } from "../utils/config";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -180,7 +181,7 @@ export default function SettingsPage() {
                 >
                   {hasApiKey
                     ? "Your API key is configured and ready to use"
-                    : "Add your Gemini API key to start optimizing prompts"}
+                    : "Add your Gemini API key after NEXT_PUBLIC_SECRET_KEY is configured for this app."}
                 </p>
               </div>
             </div>
@@ -252,6 +253,9 @@ export default function SettingsPage() {
                     <p className="text-blue-800/90 dark:text-blue-200/90 mb-3">
                       Visit Google AI Studio to get your Gemini API key.
                       It&apos;s free with generous limits.
+                      {!HAS_SECRET_KEY
+                        ? " This deployment also needs NEXT_PUBLIC_SECRET_KEY configured before keys can be saved locally."
+                        : ""}
                     </p>
                     <a
                       href="https://aistudio.google.com/app/apikey"
