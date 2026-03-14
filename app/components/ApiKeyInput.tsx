@@ -66,10 +66,12 @@ export default function ApiKeyInput({
         console.error("Failed to decrypt saved API key", result);
         toast.error("Failed to load saved API key. Please enter it again.");
         localStorage.removeItem("API_KEY");
+        onKeyVerified(false);
       } catch (error) {
         console.error("Error loading saved API key:", error);
         toast.error("Error loading saved API key. Please enter it again.");
         localStorage.removeItem("API_KEY");
+        onKeyVerified(false);
       }
     };
 
