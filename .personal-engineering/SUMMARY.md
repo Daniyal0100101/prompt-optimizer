@@ -1,2 +1,0 @@
-- 2026-03-31T14:49:15 | prompt-optimizer | Fix formatting and JSON non-deterministic flow in Prompt Optimizer output | Not requested; preparation only. | 20260331-144915-fix-formatting-and-json-non-deterministic-flow-in-prompt-opt.md
-- 2026-03-31T15:01:19 | prompt-optimizer | Fix formatting and JSON non-deterministic flow in Prompt Optimizer output | Prepared on feature branch fix/prompt-output-determinism; push and PR still require explicit approval. | 20260331-150119-fix-formatting-and-json-non-deterministic-flow-in-prompt-opt.md
