@@ -414,10 +414,208 @@ BEGIN REFINEMENT:`;
 }
 
 /**
+ * Removes markdown code fences so structured responses can be parsed reliably.
+ */
+function stripCodeFences(text: string): string {
+  return text
+    .replace(/^```json\s*/i, "")
+    .replace(/^```/, "")
+    .replace(/```$/, "")
+    .trim();
+}
+
+/**
+ * Extracts the first balanced JSON object from a response string.
+ */
+function extractFirstJsonObject(text: string): string | null {
+  const start = text.indexOf("{");
+  if (start === -1) return null;
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = start; i < text.length; i += 1) {
+    const char = text[i];
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+
+    if (char === "\\") {
+      escaped = true;
+      continue;
+    }
+
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+
+    if (inString) continue;
+
+    if (char === "{") depth += 1;
+    if (char === "}") depth -= 1;
+
+    if (depth === 0) {
+      return text.slice(start, i + 1);
+    }
+  }
+
+  return null;
+}
+
+function decodeJsonStringFragment(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  try {
+    return JSON.parse(`"${value}"`) as string;
+  } catch {
+    return value
+      .replace(/\\n/g, "\n")
+      .replace(/\\r/g, "\r")
+      .replace(/\\t/g, "\t")
+      .replace(/\\"/g, '"')
+      .replace(/\\\\/g, "\\");
+  }
+}
+
+function parseStringArrayFragment(fragment: string | undefined): string[] | undefined {
+  if (!fragment) return undefined;
+
+  try {
+    const parsed = JSON.parse(fragment) as unknown;
+    if (!Array.isArray(parsed)) return undefined;
+    return parsed.filter((item): item is string => typeof item === "string");
+  } catch {
+    return undefined;
+  }
+}
+
+function normalizeSuccessResponse(parsed: unknown): ApiResponseSuccess | null {
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return null;
+  }
+
+  const candidate = parsed as Partial<ApiResponseSuccess>;
+  const optimizedPrompt =
+    typeof candidate.optimizedPrompt === "string"
+      ? candidate.optimizedPrompt.trim()
+      : "";
+
+  if (!optimizedPrompt) return null;
+
+  const explanations = Array.isArray(candidate.explanations)
+    ? candidate.explanations.filter(
+        (item): item is string => typeof item === "string" && item.trim().length > 0
+      )
+    : [];
+
+  const suggestions = Array.isArray(candidate.suggestions)
+    ? candidate.suggestions.filter(
+        (item): item is string => typeof item === "string" && item.trim().length > 0
+      )
+    : [];
+
+  return {
+    optimizedPrompt,
+    explanations:
+      explanations.length > 0
+        ? explanations
+        : ["Structured response parsed successfully."],
+    suggestions: sanitizeSuggestions(suggestions),
+  };
+}
+
+function tryParseStructuredJson(text: string): ApiResponseSuccess | null {
+  const stripped = stripCodeFences(text);
+  const extracted = extractFirstJsonObject(stripped);
+  const candidates = [text, stripped, extracted].filter(
+    (value, index, list): value is string => !!value && list.indexOf(value) === index
+  );
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate) as unknown;
+      const normalized = normalizeSuccessResponse(parsed);
+      if (normalized) return normalized;
+    } catch {
+      // Keep trying the next parse strategy.
+    }
+  }
+
+  return null;
+}
+
+function salvageSuccessResponse(text: string): ApiResponseSuccess | null {
+  const stripped = stripCodeFences(text);
+  const optimizedPrompt = decodeJsonStringFragment(
+    stripped.match(/"optimizedPrompt"\s*:\s*"((?:\\.|[\s\S])*?)"/)?.[1]
+  )?.trim();
+
+  if (!optimizedPrompt) return null;
+
+  const explanations =
+    parseStringArrayFragment(
+      stripped.match(/"explanations"\s*:\s*(\[[\s\S]*?\])/)?.[1]
+    ) ?? ["Recovered optimized prompt from a malformed structured response."];
+
+  const suggestions = sanitizeSuggestions(
+    parseStringArrayFragment(
+      stripped.match(/"suggestions"\s*:\s*(\[[\s\S]*?\])/ )?.[1]
+    )
+  );
+
+  return {
+    optimizedPrompt,
+    explanations,
+    suggestions,
+  };
+}
+
+function normalizeFallbackText(text: string): string {
+  return stripCodeFences(text)
+    .replace(/\\n/g, "\n")
+    .replace(/\\r/g, "\r")
+    .replace(/\\t/g, "\t")
+    .replace(/\\"/g, '"')
+    .trim();
+}
+
+function parseClarifyResponse(text: string | undefined): ApiResponseClarify {
+  if (!text) return { questions: [] };
+
+  const stripped = stripCodeFences(text);
+  const extracted = extractFirstJsonObject(stripped);
+  const candidates = [text, stripped, extracted].filter(
+    (value, index, list): value is string => !!value && list.indexOf(value) === index
+  );
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate) as Partial<ApiResponseClarify>;
+      if (Array.isArray(parsed.questions)) {
+        return {
+          questions: parsed.questions.filter(
+            (item): item is string => typeof item === "string" && item.trim().length > 0
+          ),
+        };
+      }
+    } catch {
+      // Keep trying the next parse strategy.
+    }
+  }
+
+  const recovered = parseStringArrayFragment(
+    stripped.match(/"questions"\s*:\s*(\[[\s\S]*?\])/)?.[1]
+  );
+
+  return { questions: recovered ?? [] };
+}
+
+/**
  * Parses the model's text response, attempting to extract a valid JSON object.
- * It handles cases where the response is wrapped in markdown code blocks.
- * @param text The raw text response from the model.
- * @returns A parsed JSON object or a fallback structure.
+ * It handles wrapped markdown, mixed prose, and partially malformed JSON.
  */
 function parseResponse(text: string | undefined): ApiResponseSuccess {
   if (!text) {
@@ -427,26 +625,17 @@ function parseResponse(text: string | undefined): ApiResponseSuccess {
     };
   }
 
-  try {
-    return JSON.parse(text) as ApiResponseSuccess;
-  } catch {
-    const stripped = text
-      .replace(/^```json\s*/i, "")
-      .replace(/^```/, "")
-      .replace(/```$/, "")
-      .trim();
+  const parsed = tryParseStructuredJson(text);
+  if (parsed) return parsed;
 
-    try {
-      return JSON.parse(stripped) as ApiResponseSuccess;
-    } catch {
-      return {
-        optimizedPrompt: stripped || text,
-        explanations: [
-          "Unable to parse structured response; using raw output.",
-        ],
-      };
-    }
-  }
+  const salvaged = salvageSuccessResponse(text);
+  if (salvaged) return salvaged;
+
+  return {
+    optimizedPrompt: normalizeFallbackText(text),
+    explanations: ["Unable to parse structured response cleanly; normalized raw output."],
+    suggestions: [],
+  };
 }
 
 // --- API Route Handler ---
@@ -603,28 +792,18 @@ export async function POST(
 
     const responseText = result.text as string | undefined;
     if (task === "clarify") {
-      try {
-        const parsed = JSON.parse(responseText || "{}") as ApiResponseClarify;
-        return NextResponse.json({ questions: parsed.questions || [] });
-      } catch {
-        const stripped = (responseText || "")
-          .replace(/^```json\s*/i, "")
-          .replace(/^```/, "")
-          .replace(/```$/, "")
-          .trim();
-        try {
-          const fallback = JSON.parse(stripped) as ApiResponseClarify;
-          return NextResponse.json({ questions: fallback.questions || [] });
-        } catch {
-          // Fallback to generic questions
-          return NextResponse.json({
-            questions: [
-              "What specific outcome do you want?",
-              "What measurable benefits should be highlighted?",
-            ],
-          });
-        }
+      const parsed = parseClarifyResponse(responseText);
+      if (parsed.questions.length > 0) {
+        return NextResponse.json({ questions: parsed.questions.slice(0, 4) });
       }
+
+      // Fallback to generic questions
+      return NextResponse.json({
+        questions: [
+          "What specific outcome do you want?",
+          "What measurable benefits should be highlighted?",
+        ],
+      });
     }
 
     const parsedData = parseResponse(responseText);
