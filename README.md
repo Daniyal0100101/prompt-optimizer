@@ -4,6 +4,10 @@ A **Next.js** application that uses the **Gemini API** to optimize prompts for l
 
 ![App Screenshot](./screen.png)
 
+
+### 🚀 Key Achievements
+- **Secured user data by implementing client-side AES encryption for API keys and resolved 10 CVE vulnerabilities, while scaling the UI to support 12 modular React components and handling up to 1M token context windows.**
+
 ## Features
 
 - Prompt optimization for supported Gemini models
