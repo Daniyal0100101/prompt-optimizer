@@ -6,14 +6,17 @@ import {
   type GenerateContentResponse,
   type SchemaUnion,
 } from "@google/genai";
-import { ModelId } from "../../utils/modelConfig";
-import { SUPPORTED_MODELS } from "../../utils/modelConfig";
+import {
+  getDefaultModelId,
+  ModelId,
+  SUPPORTED_MODELS,
+} from "../../utils/modelConfig";
 
 // --- Type Definitions ---
 
 interface ApiRequestBody {
   prompt?: string;
-  model: ModelId;
+  model?: ModelId;
   apiKey: string;
   previousPrompt?: string;
   refinementInstruction?: string;
@@ -140,7 +143,7 @@ class ApiError extends Error {
  * @param modelId - The model ID to use for generation (without 'models/' prefix).
  * @param contents - The content to send to the model.
  * @param config - The generation configuration.
- * @param retries - The number of retry attempts.
+ * @param retries - Total attempts, including the initial request.
  * @param delay - The initial delay between retries.
  * @returns The generated content result.
  */
@@ -150,7 +153,7 @@ async function generateWithRetry(
   contents: ContentListUnion,
   config: GenerateContentConfig,
   retries = 3,
-  delay = 800
+  delay = 1000
 ): Promise<GenerateContentResponse> {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
@@ -163,21 +166,22 @@ async function generateWithRetry(
       });
     } catch (err: unknown) {
       const error = err as { status?: number; message?: string };
-      const retriable = [429, 500, 503];
+      // Do not immediately retry 429s: quota windows can exceed this route's
+      // short retry budget, and another request can add pressure.
+      const retriable = [500, 503];
 
       if (
         error?.status &&
         retriable.includes(error.status) &&
         attempt < retries
       ) {
+        const backoffMs = Math.min(delay * 2 ** (attempt - 1), 8_000);
+        const jitterMs = Math.floor(Math.random() * 251);
+        const retryDelayMs = backoffMs + jitterMs;
         console.warn(
-          `GenAI transient error (status=${
-            error.status
-          }). Retrying attempt ${attempt}/${retries} after ${
-            delay * attempt
-          }ms.`
+          `GenAI transient error (status=${error.status}). Retrying attempt ${attempt}/${retries} after ${retryDelayMs}ms.`
         );
-        await new Promise((res) => setTimeout(res, delay * attempt));
+        await new Promise((res) => setTimeout(res, retryDelayMs));
         continue;
       }
       // Re-throw as a structured ApiError
@@ -649,7 +653,7 @@ export async function POST(
     const body: ApiRequestBody = await req.json();
     const {
       prompt,
-      model = "gemini-2.5-flash",
+      model = getDefaultModelId(),
       apiKey,
       previousPrompt,
       refinementInstruction,
@@ -705,8 +709,10 @@ export async function POST(
       );
     }
 
+    // Avoid SDK retryOptions here: they wrap the final provider error and lose
+    // its HTTP status. The route owns the bounded retry policy below.
     const genAI = new GoogleGenAI({ apiKey });
-    const supportsSchema = /1\.5|2\./.test(resolvedModel);
+    const supportsSchema = /^gemini-3\./.test(resolvedModel);
 
     let contents: ContentListUnion;
     if (task === "clarify") {
