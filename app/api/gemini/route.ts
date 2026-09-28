@@ -69,7 +69,7 @@ function getFriendlyErrorMessage(status: number, raw: string): string {
   }
 
   if (status === 502) {
-    return "The model returned an incomplete response. Please try again or shorten your prompt.";
+    return "The AI provider returned a temporary gateway error. Please try again in a moment.";
   }
 
   if (
@@ -136,10 +136,12 @@ function isValidModel(model: string): model is ModelId {
  */
 class ApiError extends Error {
   status: number;
-  constructor(message: string, status: number) {
+  friendlyMessage?: string;
+  constructor(message: string, status: number, friendlyMessage?: string) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.friendlyMessage = friendlyMessage;
   }
 }
 
@@ -623,8 +625,8 @@ function parseClarifyResponse(text: string | undefined): ApiResponseClarify {
   return { questions: recovered ?? [] };
 }
 
-/** Detects structured model output with an empty optimized prompt. */
-function hasEmptyStructuredOptimizedPrompt(text: string): boolean {
+/** Detects structured model output with an invalid optimized prompt. */
+function hasInvalidStructuredOptimizedPrompt(text: string): boolean {
   const stripped = stripCodeFences(text);
   const extracted = extractFirstJsonObject(stripped);
   const candidates = [text, stripped, extracted].filter(
@@ -641,7 +643,7 @@ function hasEmptyStructuredOptimizedPrompt(text: string): boolean {
       if (!("optimizedPrompt" in parsed)) continue;
       const optimizedPrompt = (parsed as { optimizedPrompt?: unknown })
         .optimizedPrompt;
-      if (typeof optimizedPrompt === "string" && !optimizedPrompt.trim()) {
+      if (typeof optimizedPrompt !== "string" || !optimizedPrompt.trim()) {
         return true;
       }
     } catch {
@@ -838,13 +840,21 @@ export async function POST(
     );
 
     if (result.candidates?.[0]?.finishReason === FinishReason.MAX_TOKENS) {
-      throw new ApiError("Model response reached the output token limit.", 502);
+      throw new ApiError(
+        "Model response reached the output token limit.",
+        502,
+        "The model returned an incomplete response. Please try again or shorten your prompt."
+      );
     }
 
     const responseText =
       typeof result.text === "string" ? result.text.trim() : "";
     if (!responseText) {
-      throw new ApiError("Model returned an empty response.", 502);
+      throw new ApiError(
+        "Model returned an empty response.",
+        502,
+        "The model returned an incomplete response. Please try again or shorten your prompt."
+      );
     }
 
     if (task === "clarify") {
@@ -862,13 +872,21 @@ export async function POST(
       });
     }
 
-    if (hasEmptyStructuredOptimizedPrompt(responseText)) {
-      throw new ApiError("Model returned an empty optimized prompt.", 502);
+    if (hasInvalidStructuredOptimizedPrompt(responseText)) {
+      throw new ApiError(
+        "Model returned an invalid optimized prompt.",
+        502,
+        "The model returned an incomplete response. Please try again or shorten your prompt."
+      );
     }
 
     const parsedData = parseResponse(responseText);
     if (!parsedData.optimizedPrompt.trim()) {
-      throw new ApiError("Model returned an empty optimized prompt.", 502);
+      throw new ApiError(
+        "Model returned an empty optimized prompt.",
+        502,
+        "The model returned an incomplete response. Please try again or shorten your prompt."
+      );
     }
 
     return NextResponse.json({
@@ -882,7 +900,9 @@ export async function POST(
         ? error
         : new ApiError("An unexpected error occurred.", 500);
 
-    const friendly = getFriendlyErrorMessage(apiError.status, apiError.message);
+    const friendly =
+      apiError.friendlyMessage ??
+      getFriendlyErrorMessage(apiError.status, apiError.message);
     return NextResponse.json({ error: friendly }, { status: apiError.status });
   }
 }

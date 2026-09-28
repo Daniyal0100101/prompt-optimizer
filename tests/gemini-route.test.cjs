@@ -6,12 +6,14 @@ const ts = require("typescript");
 
 let providerResponse;
 let providerRequest;
+let providerError;
 
 class MockGoogleGenAI {
   constructor() {
     this.models = {
       generateContent: async (request) => {
         providerRequest = request;
+        if (providerError) throw providerError;
         return providerResponse;
       },
     };
@@ -62,6 +64,7 @@ test.after(() => {
 test.beforeEach(() => {
   providerResponse = undefined;
   providerRequest = undefined;
+  providerError = undefined;
 });
 
 async function post(body, response) {
@@ -127,6 +130,26 @@ test("returns 502 for structured output with an empty optimized prompt", async (
 
   assert.equal(response.status, 502);
   assert.match(response.body.error, /incomplete response/i);
+});
+
+test("rejects a structured response with a non-string optimized prompt", async () => {
+  const response = await post(baseBody, {
+    text: JSON.stringify({ optimizedPrompt: 123, explanations: [] }),
+    candidates: [{ finishReason: "STOP" }],
+  });
+
+  assert.equal(response.status, 502);
+  assert.match(response.body.error, /incomplete response/i);
+});
+
+test("does not misclassify a provider 502 as incomplete model output", async () => {
+  providerError = Object.assign(new Error("Upstream gateway failure"), {
+    status: 502,
+  });
+  const response = await post(baseBody, undefined);
+
+  assert.equal(response.status, 502);
+  assert.match(response.body.error, /temporary gateway error/i);
 });
 
 test("returns 502 for output truncated at the token limit", async () => {
