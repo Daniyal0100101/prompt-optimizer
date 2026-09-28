@@ -18,6 +18,7 @@ interface ApiKeyInputProps {
   onModelChange?: (modelId: ModelId) => void;
 }
 
+/** Stores and verifies the user's Gemini key and model selection. */
 export default function ApiKeyInput({
   onKeyVerified,
   className = "",
@@ -206,11 +207,20 @@ export default function ApiKeyInput({
                   <div className="text-xs text-gray-500 dark:text-gray-400">
                     {model.description}
                   </div>
+                  <div className="mt-1 text-xs font-medium text-blue-700 dark:text-blue-300">
+                    {`Stable · Free tier${
+                      model.recommended ? " · Recommended" : ""
+                    }`}
+                  </div>
                 </button>
               ))}
             </div>
           )}
         </div>
+        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+          These stable models have free-tier API access; availability and
+          quotas vary by model and account.
+        </p>
       </div>
 
       <div className="relative">

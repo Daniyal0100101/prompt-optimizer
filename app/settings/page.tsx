@@ -17,11 +17,19 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { HAS_SECRET_KEY } from "../utils/config";
+import {
+  getDefaultModelId,
+  getModelById,
+  getSelectedModel,
+  ModelId,
+} from "../utils/modelConfig";
 
+/** Renders appearance, API key, and model preferences for the app. */
 export default function SettingsPage() {
   const router = useRouter();
   const { themeMode, setTheme, mounted } = useTheme();
-  const [selectedModel, setSelectedModel] = useState<string>("");
+  const [selectedModel, setSelectedModel] =
+    useState<ModelId>(getDefaultModelId());
   const [hasApiKey, setHasApiKey] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -31,9 +39,8 @@ export default function SettingsPage() {
       const saved = localStorage.getItem("API_KEY");
       setHasApiKey(!!saved);
 
-      // Get selected model
-      const savedModel = localStorage.getItem("selected-model");
-      setSelectedModel(savedModel || "gemini-2.5-flash");
+      // Resolve older or unsupported saved model IDs to the current default.
+      setSelectedModel(getSelectedModel());
     } catch {
       setHasApiKey(false);
     } finally {
@@ -49,7 +56,7 @@ export default function SettingsPage() {
     }
   }, []);
 
-  const handleModelChange = useCallback((modelId: string) => {
+  const handleModelChange = useCallback((modelId: ModelId) => {
     setSelectedModel(modelId);
   }, []);
 
@@ -78,25 +85,6 @@ export default function SettingsPage() {
     },
   ];
 
-  // Model info for display
-  const modelInfo = {
-    "gemini-2.5-flash": {
-      name: "Gemini 2.5 Flash",
-      description: "Best price-performance with thinking capabilities",
-      features: ["1M context", "64K output", "Thinking", "Recommended"],
-    },
-    "gemini-2.5-flash-lite": {
-      name: "Gemini 2.5 Flash-Lite",
-      description: "Most cost-efficient for high-volume tasks",
-      features: ["1M context", "8K output", "Thinking", "Cost-efficient"],
-    },
-    "gemini-2.5-pro": {
-      name: "Gemini 2.5 Pro",
-      description: "Flagship model for complex reasoning",
-      features: ["1M context", "64K output", "Advanced reasoning"],
-    },
-
-  };
 
   if (!mounted || isLoading) {
     return (
@@ -111,9 +99,7 @@ export default function SettingsPage() {
     );
   }
 
-  const currentModelInfo =
-    modelInfo[selectedModel as keyof typeof modelInfo] ||
-    modelInfo["gemini-2.5-flash"];
+  const currentModelInfo = getModelById(selectedModel);
 
   return (
     <main className="min-h-[100svh] sm:min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30 dark:from-gray-950 dark:via-gray-900 dark:to-blue-950/20">
@@ -254,7 +240,8 @@ export default function SettingsPage() {
                     </p>
                     <p className="text-blue-800/90 dark:text-blue-200/90 mb-3">
                       Visit Google AI Studio to get your Gemini API key.
-                      It&apos;s free with generous limits.
+                      Some models have free API access, subject to model-specific
+                      limits and account eligibility.
                       {!HAS_SECRET_KEY
                         ? " This deployment also needs NEXT_PUBLIC_SECRET_KEY configured before keys can be saved locally."
                         : ""}

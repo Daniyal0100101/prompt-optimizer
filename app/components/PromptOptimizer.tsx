@@ -27,7 +27,11 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { getSelectedModel, ModelId } from "../utils/modelConfig";
+import {
+  getDefaultModelId,
+  getSelectedModel,
+  ModelId,
+} from "../utils/modelConfig";
 import { HAS_SECRET_KEY, SECRET_KEY } from "../utils/config";
 import { decryptSafe, getIV } from "../utils/cryptoUtils";
 import { generateSessionName } from "../utils/sessionNaming";
@@ -123,6 +127,7 @@ const clearCoachingState = (sessionId: string) => {
 
 // --- Main Component ---
 
+/** Renders the prompt optimization workspace and manages its chat sessions. */
 export default function PromptOptimizer({
   apiKey: apiKeyProp,
 }: PromptOptimizerProps) {
@@ -134,7 +139,7 @@ export default function PromptOptimizer({
   const [isLoading, setIsLoading] = useState(false);
   const [isApiKeyValid, setIsApiKeyValid] = useState(false);
   const [selectedModel, setSelectedModel] =
-    useState<ModelId>("gemini-2.5-flash");
+    useState<ModelId>(getDefaultModelId());
   const [apiKey, setApiKey] = useState(apiKeyProp || "");
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);

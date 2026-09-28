@@ -1,7 +1,9 @@
 export type ModelId =
-  | "gemini-2.5-flash"
-  | "gemini-2.5-flash-lite"
-  | "gemini-2.5-pro";
+  | "gemini-3.8-flash"
+  | "gemini-3.7-flash"
+  | "gemini-3.6-flash"
+  | "gemini-3.5-flash"
+  | "gemini-3.5-flash-lite";
 
 export interface ModelInfo {
   id: ModelId;
@@ -10,48 +12,81 @@ export interface ModelInfo {
   maxTokens: number; // Input token limit
   outputTokens: number; // Output token limit
   contextWindow: number; // Same as maxTokens for clarity
+  releaseStatus: "stable";
+  features: readonly string[];
   recommended?: boolean;
 }
 
+const ONE_MILLION_TOKEN_CONTEXT = 1_048_576;
+const SIXTY_FIVE_THOUSAND_OUTPUT_TOKENS = 65_536;
+
 export const SUPPORTED_MODELS: ModelInfo[] = [
   {
-    id: "gemini-2.5-flash",
-    name: "Gemini 2.5 Flash",
+    id: "gemini-3.8-flash",
+    name: "Gemini 3.8 Flash",
     description:
-      "Best price-performance model with thinking capabilities and well-rounded features",
-    maxTokens: 1_048_576, // 1M tokens input
-    outputTokens: 65_536, // 64K tokens output
-    contextWindow: 1_048_576,
+      "Google AI Studio free-tier model for strong general-purpose reasoning and prompt optimization",
+    maxTokens: ONE_MILLION_TOKEN_CONTEXT,
+    outputTokens: SIXTY_FIVE_THOUSAND_OUTPUT_TOKENS,
+    contextWindow: ONE_MILLION_TOKEN_CONTEXT,
+    releaseStatus: "stable",
+    features: ["1M context", "64K output", "Stable", "Free tier"],
     recommended: true,
   },
   {
-    id: "gemini-2.5-flash-lite",
-    name: "Gemini 2.5 Flash-Lite",
+    id: "gemini-3.7-flash",
+    name: "Gemini 3.7 Flash",
     description:
-      "Most cost-efficient option for high-volume tasks with excellent quality",
-    maxTokens: 1_048_576, // 1M tokens input
-    outputTokens: 8_192, // 8K tokens output
-    contextWindow: 1_048_576,
+      "Stable free-tier Flash model for coding, tool use, and multi-step tasks",
+    maxTokens: ONE_MILLION_TOKEN_CONTEXT,
+    outputTokens: SIXTY_FIVE_THOUSAND_OUTPUT_TOKENS,
+    contextWindow: ONE_MILLION_TOKEN_CONTEXT,
+    releaseStatus: "stable",
+    features: ["1M context", "64K output", "Stable", "Free tier"],
   },
   {
-    id: "gemini-2.5-pro",
-    name: "Gemini 2.5 Pro",
+    id: "gemini-3.6-flash",
+    name: "Gemini 3.6 Flash",
     description:
-      "Flagship thinking model for complex reasoning, coding, and multi-step tasks",
-    maxTokens: 1_048_576, // 1M tokens input
-    outputTokens: 65_536, // 64K tokens output
-    contextWindow: 1_048_576,
+      "Stable free-tier Flash model balancing speed and multimodal capabilities",
+    maxTokens: ONE_MILLION_TOKEN_CONTEXT,
+    outputTokens: SIXTY_FIVE_THOUSAND_OUTPUT_TOKENS,
+    contextWindow: ONE_MILLION_TOKEN_CONTEXT,
+    releaseStatus: "stable",
+    features: ["1M context", "64K output", "Stable", "Free tier"],
   },
-
+  {
+    id: "gemini-3.5-flash",
+    name: "Gemini 3.5 Flash",
+    description:
+      "Stable free-tier Flash model for general-purpose and high-throughput tasks",
+    maxTokens: ONE_MILLION_TOKEN_CONTEXT,
+    outputTokens: SIXTY_FIVE_THOUSAND_OUTPUT_TOKENS,
+    contextWindow: ONE_MILLION_TOKEN_CONTEXT,
+    releaseStatus: "stable",
+    features: ["1M context", "64K output", "Stable", "Free tier"],
+  },
+  {
+    id: "gemini-3.5-flash-lite",
+    name: "Gemini 3.5 Flash-Lite",
+    description:
+      "Stable free-tier option optimized for low-latency, cost-efficient requests",
+    maxTokens: ONE_MILLION_TOKEN_CONTEXT,
+    outputTokens: SIXTY_FIVE_THOUSAND_OUTPUT_TOKENS,
+    contextWindow: ONE_MILLION_TOKEN_CONTEXT,
+    releaseStatus: "stable",
+    features: ["1M context", "64K output", "Stable", "Free tier", "Efficient"],
+  },
 ];
 
-// Get default model ID - 2.5 Flash is the recommended price-performance option
-export const getDefaultModelId = (): ModelId => "gemini-2.5-flash";
+/** Returns the default model ID for new sessions and migrated selections. */
+export const getDefaultModelId = (): ModelId => "gemini-3.8-flash";
 
-// Get model by ID
+/** Returns model metadata, or the default for unknown IDs. */
 export const getModelById = (id: string): ModelInfo => {
   return (
-    SUPPORTED_MODELS.find((model) => model.id === id) || SUPPORTED_MODELS[2] // Default to 2.5 Flash
+    SUPPORTED_MODELS.find((model) => model.id === id) ||
+    SUPPORTED_MODELS.find((model) => model.id === getDefaultModelId())!
   );
 };
 
@@ -62,7 +97,7 @@ export const saveSelectedModel = (modelId: ModelId): void => {
   }
 };
 
-// Get selected model from localStorage or return default
+/** Reads the saved supported model, falling back when it is missing or stale. */
 export const getSelectedModel = (): ModelId => {
   if (typeof window === "undefined") return getDefaultModelId();
   const saved = localStorage.getItem("selected-model");
@@ -77,46 +112,3 @@ export const getTokenInfo = () => ({
   wordsPerHundredTokens: "60-80 English words",
   note: "Token count varies by language and content type",
 });
-
-// Validate if a model supports specific features
-export const getModelCapabilities = (modelId: ModelId) => {
-  const capabilities = {
-
-    "gemini-2.5-flash": {
-      multimodal: true,
-      functionCalling: true,
-      caching: true,
-      tuning: false,
-      codeExecution: true,
-      thinking: true,
-      searchGrounding: true,
-      maxVideoLength: "varies",
-      maxAudioLength: "varies",
-    },
-    "gemini-2.5-flash-lite": {
-      multimodal: true,
-      functionCalling: true,
-      caching: true,
-      tuning: false,
-      codeExecution: true,
-      thinking: true,
-      searchGrounding: false,
-      maxVideoLength: "varies",
-      maxAudioLength: "varies",
-    },
-    "gemini-2.5-pro": {
-      multimodal: true,
-      functionCalling: true,
-      caching: true,
-      tuning: false,
-      codeExecution: true,
-      thinking: true,
-      searchGrounding: true,
-      reasoning: "advanced",
-      maxVideoLength: "varies",
-      maxAudioLength: "varies",
-    },
-  };
-
-  return capabilities[modelId];
-};

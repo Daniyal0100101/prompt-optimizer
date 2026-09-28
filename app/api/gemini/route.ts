@@ -1,19 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  FinishReason,
   GoogleGenAI,
+  ThinkingLevel,
   type ContentListUnion,
   type GenerateContentConfig,
   type GenerateContentResponse,
   type SchemaUnion,
 } from "@google/genai";
-import { ModelId } from "../../utils/modelConfig";
-import { SUPPORTED_MODELS } from "../../utils/modelConfig";
+import {
+  getDefaultModelId,
+  ModelId,
+  SUPPORTED_MODELS,
+} from "../../utils/modelConfig";
 
 // --- Type Definitions ---
 
 interface ApiRequestBody {
   prompt?: string;
-  model: ModelId;
+  model?: ModelId;
   apiKey: string;
   previousPrompt?: string;
   refinementInstruction?: string;
@@ -61,6 +66,10 @@ function getFriendlyErrorMessage(status: number, raw: string): string {
   // Handle 404 model not found errors
   if (status === 404 || msg.includes("not found") || msg.includes("models/")) {
     return "The selected AI model is currently unavailable. Please try a different model in Settings or wait a moment.";
+  }
+
+  if (status === 502) {
+    return "The AI provider returned a temporary gateway error. Please try again in a moment.";
   }
 
   if (
@@ -127,10 +136,12 @@ function isValidModel(model: string): model is ModelId {
  */
 class ApiError extends Error {
   status: number;
-  constructor(message: string, status: number) {
+  friendlyMessage?: string;
+  constructor(message: string, status: number, friendlyMessage?: string) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.friendlyMessage = friendlyMessage;
   }
 }
 
@@ -140,7 +151,7 @@ class ApiError extends Error {
  * @param modelId - The model ID to use for generation (without 'models/' prefix).
  * @param contents - The content to send to the model.
  * @param config - The generation configuration.
- * @param retries - The number of retry attempts.
+ * @param retries - Total attempts, including the initial request.
  * @param delay - The initial delay between retries.
  * @returns The generated content result.
  */
@@ -150,7 +161,7 @@ async function generateWithRetry(
   contents: ContentListUnion,
   config: GenerateContentConfig,
   retries = 3,
-  delay = 800
+  delay = 1000
 ): Promise<GenerateContentResponse> {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
@@ -163,21 +174,22 @@ async function generateWithRetry(
       });
     } catch (err: unknown) {
       const error = err as { status?: number; message?: string };
-      const retriable = [429, 500, 503];
+      // Do not immediately retry 429s: quota windows can exceed this route's
+      // short retry budget, and another request can add pressure.
+      const retriable = [500, 503];
 
       if (
         error?.status &&
         retriable.includes(error.status) &&
         attempt < retries
       ) {
+        const backoffMs = Math.min(delay * 2 ** (attempt - 1), 8_000);
+        const jitterMs = Math.floor(Math.random() * 251);
+        const retryDelayMs = backoffMs + jitterMs;
         console.warn(
-          `GenAI transient error (status=${
-            error.status
-          }). Retrying attempt ${attempt}/${retries} after ${
-            delay * attempt
-          }ms.`
+          `GenAI transient error (status=${error.status}). Retrying attempt ${attempt}/${retries} after ${retryDelayMs}ms.`
         );
-        await new Promise((res) => setTimeout(res, delay * attempt));
+        await new Promise((res) => setTimeout(res, retryDelayMs));
         continue;
       }
       // Re-throw as a structured ApiError
@@ -613,6 +625,35 @@ function parseClarifyResponse(text: string | undefined): ApiResponseClarify {
   return { questions: recovered ?? [] };
 }
 
+/** Detects structured model output with an invalid optimized prompt. */
+function hasInvalidStructuredOptimizedPrompt(text: string): boolean {
+  const stripped = stripCodeFences(text);
+  const extracted = extractFirstJsonObject(stripped);
+  const candidates = [text, stripped, extracted].filter(
+    (value, index, list): value is string =>
+      !!value && list.indexOf(value) === index
+  );
+
+  for (const candidate of candidates) {
+    try {
+      const parsed: unknown = JSON.parse(candidate);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        continue;
+      }
+      if (!("optimizedPrompt" in parsed)) continue;
+      const optimizedPrompt = (parsed as { optimizedPrompt?: unknown })
+        .optimizedPrompt;
+      if (typeof optimizedPrompt !== "string" || !optimizedPrompt.trim()) {
+        return true;
+      }
+    } catch {
+      // Ignore non-JSON candidates; parseResponse handles its fallback formats.
+    }
+  }
+
+  return false;
+}
+
 /**
  * Parses the model's text response, attempting to extract a valid JSON object.
  * It handles wrapped markdown, mixed prose, and partially malformed JSON.
@@ -640,6 +681,9 @@ function parseResponse(text: string | undefined): ApiResponseSuccess {
 
 // --- API Route Handler ---
 
+/**
+ * Runs a prompt optimization, clarification, or refinement request.
+ */
 export async function POST(
   req: NextRequest
 ): Promise<
@@ -649,7 +693,7 @@ export async function POST(
     const body: ApiRequestBody = await req.json();
     const {
       prompt,
-      model = "gemini-2.5-flash",
+      model = getDefaultModelId(),
       apiKey,
       previousPrompt,
       refinementInstruction,
@@ -705,8 +749,10 @@ export async function POST(
       );
     }
 
+    // Avoid SDK retryOptions here: they wrap the final provider error and lose
+    // its HTTP status. The route owns the bounded retry policy below.
     const genAI = new GoogleGenAI({ apiKey });
-    const supportsSchema = /1\.5|2\./.test(resolvedModel);
+    const supportsSchema = /^gemini-3\./.test(resolvedModel);
 
     let contents: ContentListUnion;
     if (task === "clarify") {
@@ -745,8 +791,11 @@ export async function POST(
       temperature: 0.3,
       topP: 0.9,
       topK: 32,
-      // Limit output tokens to reduce costs and improve response time
-      maxOutputTokens: task === "clarify" ? 512 : 2048, // Clarify needs fewer tokens
+      // Keep Gemini 3 reasoning bounded while reserving room for final output.
+      thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+      // Thinking tokens are included in maxOutputTokens; leave ample room for
+      // the optimized prompt and explanations (and fewer tokens for questions).
+      maxOutputTokens: task === "clarify" ? 4_096 : 8_192,
     };
 
     if (supportsSchema) {
@@ -790,7 +839,24 @@ export async function POST(
       config
     );
 
-    const responseText = result.text as string | undefined;
+    if (result.candidates?.[0]?.finishReason === FinishReason.MAX_TOKENS) {
+      throw new ApiError(
+        "Model response reached the output token limit.",
+        502,
+        "The model returned an incomplete response. Please try again or shorten your prompt."
+      );
+    }
+
+    const responseText =
+      typeof result.text === "string" ? result.text.trim() : "";
+    if (!responseText) {
+      throw new ApiError(
+        "Model returned an empty response.",
+        502,
+        "The model returned an incomplete response. Please try again or shorten your prompt."
+      );
+    }
+
     if (task === "clarify") {
       const parsed = parseClarifyResponse(responseText);
       if (parsed.questions.length > 0) {
@@ -806,7 +872,23 @@ export async function POST(
       });
     }
 
+    if (hasInvalidStructuredOptimizedPrompt(responseText)) {
+      throw new ApiError(
+        "Model returned an invalid optimized prompt.",
+        502,
+        "The model returned an incomplete response. Please try again or shorten your prompt."
+      );
+    }
+
     const parsedData = parseResponse(responseText);
+    if (!parsedData.optimizedPrompt.trim()) {
+      throw new ApiError(
+        "Model returned an empty optimized prompt.",
+        502,
+        "The model returned an incomplete response. Please try again or shorten your prompt."
+      );
+    }
+
     return NextResponse.json({
       ...parsedData,
       suggestions: sanitizeSuggestions(parsedData.suggestions),
@@ -818,7 +900,9 @@ export async function POST(
         ? error
         : new ApiError("An unexpected error occurred.", 500);
 
-    const friendly = getFriendlyErrorMessage(apiError.status, apiError.message);
+    const friendly =
+      apiError.friendlyMessage ??
+      getFriendlyErrorMessage(apiError.status, apiError.message);
     return NextResponse.json({ error: friendly }, { status: apiError.status });
   }
 }
