@@ -127,6 +127,7 @@ const clearCoachingState = (sessionId: string) => {
 
 // --- Main Component ---
 
+/** Renders the prompt optimization workspace and manages its chat sessions. */
 export default function PromptOptimizer({
   apiKey: apiKeyProp,
 }: PromptOptimizerProps) {

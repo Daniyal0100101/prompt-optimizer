@@ -79,10 +79,10 @@ export const SUPPORTED_MODELS: ModelInfo[] = [
   },
 ];
 
-// Gemini 3.8 Flash is Google's latest stable, free-tier general-purpose option.
+/** Returns the default model ID for new sessions and migrated selections. */
 export const getDefaultModelId = (): ModelId => "gemini-3.8-flash";
 
-// Get model by ID
+/** Returns model metadata, or the default for unknown IDs. */
 export const getModelById = (id: string): ModelInfo => {
   return (
     SUPPORTED_MODELS.find((model) => model.id === id) ||
@@ -97,7 +97,7 @@ export const saveSelectedModel = (modelId: ModelId): void => {
   }
 };
 
-// Get selected model from localStorage or return default
+/** Reads the saved supported model, falling back when it is missing or stale. */
 export const getSelectedModel = (): ModelId => {
   if (typeof window === "undefined") return getDefaultModelId();
   const saved = localStorage.getItem("selected-model");

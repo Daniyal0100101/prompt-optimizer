@@ -18,6 +18,7 @@ interface ApiKeyInputProps {
   onModelChange?: (modelId: ModelId) => void;
 }
 
+/** Stores and verifies the user's Gemini key and model selection. */
 export default function ApiKeyInput({
   onKeyVerified,
   className = "",

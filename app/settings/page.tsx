@@ -24,6 +24,7 @@ import {
   ModelId,
 } from "../utils/modelConfig";
 
+/** Renders appearance, API key, and model preferences for the app. */
 export default function SettingsPage() {
   const router = useRouter();
   const { themeMode, setTheme, mounted } = useTheme();

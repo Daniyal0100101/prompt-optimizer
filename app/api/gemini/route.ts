@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  FinishReason,
   GoogleGenAI,
+  ThinkingLevel,
   type ContentListUnion,
   type GenerateContentConfig,
   type GenerateContentResponse,
@@ -64,6 +66,10 @@ function getFriendlyErrorMessage(status: number, raw: string): string {
   // Handle 404 model not found errors
   if (status === 404 || msg.includes("not found") || msg.includes("models/")) {
     return "The selected AI model is currently unavailable. Please try a different model in Settings or wait a moment.";
+  }
+
+  if (status === 502) {
+    return "The model returned an incomplete response. Please try again or shorten your prompt.";
   }
 
   if (
@@ -617,6 +623,35 @@ function parseClarifyResponse(text: string | undefined): ApiResponseClarify {
   return { questions: recovered ?? [] };
 }
 
+/** Detects structured model output with an empty optimized prompt. */
+function hasEmptyStructuredOptimizedPrompt(text: string): boolean {
+  const stripped = stripCodeFences(text);
+  const extracted = extractFirstJsonObject(stripped);
+  const candidates = [text, stripped, extracted].filter(
+    (value, index, list): value is string =>
+      !!value && list.indexOf(value) === index
+  );
+
+  for (const candidate of candidates) {
+    try {
+      const parsed: unknown = JSON.parse(candidate);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        continue;
+      }
+      if (!("optimizedPrompt" in parsed)) continue;
+      const optimizedPrompt = (parsed as { optimizedPrompt?: unknown })
+        .optimizedPrompt;
+      if (typeof optimizedPrompt === "string" && !optimizedPrompt.trim()) {
+        return true;
+      }
+    } catch {
+      // Ignore non-JSON candidates; parseResponse handles its fallback formats.
+    }
+  }
+
+  return false;
+}
+
 /**
  * Parses the model's text response, attempting to extract a valid JSON object.
  * It handles wrapped markdown, mixed prose, and partially malformed JSON.
@@ -644,6 +679,9 @@ function parseResponse(text: string | undefined): ApiResponseSuccess {
 
 // --- API Route Handler ---
 
+/**
+ * Runs a prompt optimization, clarification, or refinement request.
+ */
 export async function POST(
   req: NextRequest
 ): Promise<
@@ -751,8 +789,11 @@ export async function POST(
       temperature: 0.3,
       topP: 0.9,
       topK: 32,
-      // Limit output tokens to reduce costs and improve response time
-      maxOutputTokens: task === "clarify" ? 512 : 2048, // Clarify needs fewer tokens
+      // Keep Gemini 3 reasoning bounded while reserving room for final output.
+      thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+      // Thinking tokens are included in maxOutputTokens; leave ample room for
+      // the optimized prompt and explanations (and fewer tokens for questions).
+      maxOutputTokens: task === "clarify" ? 4_096 : 8_192,
     };
 
     if (supportsSchema) {
@@ -796,7 +837,16 @@ export async function POST(
       config
     );
 
-    const responseText = result.text as string | undefined;
+    if (result.candidates?.[0]?.finishReason === FinishReason.MAX_TOKENS) {
+      throw new ApiError("Model response reached the output token limit.", 502);
+    }
+
+    const responseText =
+      typeof result.text === "string" ? result.text.trim() : "";
+    if (!responseText) {
+      throw new ApiError("Model returned an empty response.", 502);
+    }
+
     if (task === "clarify") {
       const parsed = parseClarifyResponse(responseText);
       if (parsed.questions.length > 0) {
@@ -812,7 +862,15 @@ export async function POST(
       });
     }
 
+    if (hasEmptyStructuredOptimizedPrompt(responseText)) {
+      throw new ApiError("Model returned an empty optimized prompt.", 502);
+    }
+
     const parsedData = parseResponse(responseText);
+    if (!parsedData.optimizedPrompt.trim()) {
+      throw new ApiError("Model returned an empty optimized prompt.", 502);
+    }
+
     return NextResponse.json({
       ...parsedData,
       suggestions: sanitizeSuggestions(parsedData.suggestions),

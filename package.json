@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint . --ext .js,.jsx,.ts,.tsx --ignore-pattern .next --ignore-pattern next-env.d.ts"
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx --ignore-pattern .next --ignore-pattern next-env.d.ts",
+    "test": "node --test tests/gemini-route.test.cjs"
   },
   "dependencies": {
     "@google/genai": "^1.19.0",
