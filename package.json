@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx --ignore-pattern .next --ignore-pattern next-env.d.ts",
-    "test": "node --test tests/gemini-route.test.cjs"
+    "test": "node --test tests/gemini-route.test.cjs tests/css-pipeline.test.cjs"
   },
   "dependencies": {
     "@google/genai": "^1.19.0",
@@ -38,6 +38,7 @@
     "typescript": "^5.3.3"
   },
   "overrides": {
-    "postcss": "8.5.31"
+    "postcss": "8.5.31",
+    "postcss-selector-parser": "7.1.7"
   }
 }
