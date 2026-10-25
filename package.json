@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx --ignore-pattern .next --ignore-pattern next-env.d.ts",
-    "test": "node --test tests/*.test.cjs"
+    "test": "node --test tests/gemini-route.test.cjs tests/css-pipeline.test.cjs"
   },
   "dependencies": {
     "@google/genai": "^1.19.0",
